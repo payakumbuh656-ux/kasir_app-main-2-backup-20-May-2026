@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Stock items in the minimarket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "barcode": { "type": "string" },
+        "name": { "type": "string" },
+        "supplier": { "type": "string" },
+        "price": { "type": "number" },
+        "modal": { "type": "number" },
+        "stock": { "type": "number" },
+        "category": { "type": "string" }
+      },
+      "required": ["barcode", "name", "price", "stock", "category"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Sales records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "changeAmount": { "type": "number" },
+        "date": { "type": "string" }
+      },
+      "required": ["items", "total", "paidAmount", "changeAmount", "date"]
+    }
+  },
+  "firestore": {
+    "products": {
+      "schema": "Product",
+      "description": "Catalog of available products"
+    },
+    "transactions": {
+      "schema": "Transaction",
+      "description": "History of all sales"
+    }
+  }
+}

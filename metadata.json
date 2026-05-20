@@ -1,0 +1,6 @@
+{
+  "name": "IndoTech POS",
+  "description": "A comprehensive point of sale system with stock management, financial reports, and Firebase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

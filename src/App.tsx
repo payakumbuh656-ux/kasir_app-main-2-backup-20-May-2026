@@ -159,8 +159,16 @@ useEffect(() => {
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      
+      if (
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/cancelled-popup-request'
+      ) {
+        return;
+      }
+
       alert('Gagal login Google');
     }
   };

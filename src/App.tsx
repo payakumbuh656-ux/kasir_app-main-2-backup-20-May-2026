@@ -22,13 +22,15 @@ import { db, auth, googleProvider } from './lib/firebase';
 
 import {
   signInWithPopup,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut
 } from 'firebase/auth';
 
 import {
   collection,
   onSnapshot,
   setDoc,
+  getDoc,
   doc,
   deleteDoc,
   query,
@@ -67,25 +69,80 @@ const DEFAULT_PRODUCTS: Product[] = [
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+
+  const [storeName, setStoreName] = useState('');
+  const [role, setRole] = useState('owner');
+  const [loadingStore, setLoadingStore] = useState(true);
+
+  const [setupStoreName, setSetupStoreName] = useState('');
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginData, setLoginData] = useState({ username: '', password: '' });
-  
+  const [loginData, setLoginData] = useState({
+    username: '',
+    password: ''
+  });
+
   const [view, setView] = useState<'pos' | 'stock' | 'history' | 'reports'>('pos');
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
 
   // Firebase Sync
 useEffect(() => {
-  const unsubAuth = onAuthStateChanged(auth, (u) => {
+  const unsubAuth = onAuthStateChanged(auth, async (u) => {
     setUser(u);
 
     if (u) {
       setIsLoggedIn(true);
+
+     console.log('USER LOGIN:', u.uid);
+
+const userRef = doc(db, 'users', u.uid);
+
+const userSnap = await getDoc(userRef);
+
+if (!userSnap.exists()) {
+
+  console.log('MEMBUAT USER BARU');
+
+  await setDoc(
+    userRef,
+    {
+      email: u.email || '',
+      displayName: u.displayName || '',
+      storeName: '',
+      role: 'owner'
+    },
+    {
+      merge: true
+    }
+  );
+}
+
+const latestSnap = await getDoc(userRef);
+
+if (latestSnap.exists()) {
+  const data = latestSnap.data();
+
+  setStoreName(data.storeName || '');
+  setRole(data.role || 'owner');
+}
+
+setLoadingStore(false);
+
+console.log('USER DOC BERHASIL DIBACA');
+
     } else {
       setIsLoggedIn(false);
+
       setProducts([]);
       setTransactions([]);
+
+      setStoreName('');
+      setRole('owner');
+
+      setLoadingStore(false);
     }
   });
 
@@ -156,36 +213,74 @@ useEffect(() => {
     }
   }, [posSearch, view, products]);
 
-  const handleGoogleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error(error);
-      
-      if (
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        return;
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+const handleGoogleLogin = async () => {
+  if (isLoggingIn) return;
+
+  try {
+    setIsLoggingIn(true);
+
+    await signInWithPopup(auth, googleProvider);
+
+  } catch (error: any) {
+    console.error(error);
+
+    if (
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request'
+    ) {
+      return;
+    }
+
+    alert('Gagal login Google');
+
+  } finally {
+    setIsLoggingIn(false);
+  }
+};
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const handleSaveStore = async () => {
+  if (!user) return;
+
+  try {
+    await setDoc(
+      doc(db, 'users', user.uid),
+      {
+        storeName: setupStoreName
+      },
+      {
+        merge: true
       }
+    );
 
-      alert('Gagal login Google');
-    }
-  };
+    setStoreName(setupStoreName);
 
-  const handleLogout = async () => {
-    await auth.signOut();
-    setIsLoggedIn(false);
-  };
+  } catch (error) {
+    console.error(error);
+  }
+};
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginData.username === 'admin' && loginData.password === 'admin123') {
-      setIsLoggedIn(true);
-    } else {
-      alert('Username: admin, Password: admin123');
-    }
-  };
+const handleLogin = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (
+    loginData.username === 'admin' &&
+    loginData.password === 'admin123'
+  ) {
+    setIsLoggedIn(true);
+  } else {
+    alert('Username: admin, Password: admin123');
+  }
+};
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {

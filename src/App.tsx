@@ -403,6 +403,17 @@ const handleLogin = (e: React.FormEvent) => {
     }
   };
 
+  if (loadingStore) {
+  return (
+    <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Memuat data toko...</h2>
+        <p className="text-slate-400 mt-2">Mohon tunggu sebentar</p>
+      </div>
+    </div>
+  );
+}
+
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-4">

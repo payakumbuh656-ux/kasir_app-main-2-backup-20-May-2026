@@ -16,6 +16,7 @@ import {
   Edit2,
   Printer,
   PieChart as ChartIcon,
+  Settings,
   LogIn
 } from 'lucide-react';
 import { db, auth, googleProvider } from './lib/firebase';
@@ -507,6 +508,19 @@ const handleLogin = (e: React.FormEvent) => {
           >
             <ChartIcon size={24} />
           </button>
+          
+          <button
+          onClick={() => setView('settings')}
+          className={`p-3 rounded-xl transition-all ${
+            view === 'settings'
+              ? 'text-indigo-600 bg-indigo-50'
+              : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50'
+          }`}
+          title="Pengaturan"
+          >
+            <Settings size={24} />
+          </button>
+
         </nav>
         <button 
           onClick={handleLogout}
@@ -902,6 +916,69 @@ const handleLogin = (e: React.FormEvent) => {
             </div>
           </div>
         )}
+
+        {view === 'settings' && (
+  <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
+    
+    <header className="mb-8">
+      <h1 className="text-2xl font-bold text-indigo-600">
+        Pengaturan Toko
+      </h1>
+      <p className="text-slate-500 text-sm">
+        Kelola profil dan identitas toko Anda.
+      </p>
+    </header>
+
+    <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm max-w-3xl">
+      
+      <div className="mb-6">
+        <label className="block text-sm font-bold text-slate-600 mb-2">
+          Nama Toko
+        </label>
+
+        <input
+          type="text"
+          value={storeName}
+          onChange={(e) => setStoreName(e.target.value)}
+          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+        />
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-bold text-slate-600 mb-2">
+          Email Akun
+        </label>
+
+        <input
+          type="text"
+          value={user?.email || ''}
+          disabled
+          className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl"
+        />
+      </div>
+
+      <div className="mb-8">
+        <label className="block text-sm font-bold text-slate-600 mb-2">
+          Role
+        </label>
+
+        <input
+          type="text"
+          value={role}
+          disabled
+          className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl"
+        />
+      </div>
+
+      <button
+        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all"
+      >
+        Simpan Perubahan
+      </button>
+
+    </div>
+  </div>
+)}
 
       </main>
 

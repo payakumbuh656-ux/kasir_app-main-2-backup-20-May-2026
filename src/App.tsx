@@ -127,6 +127,7 @@ if (latestSnap.exists()) {
   const data = latestSnap.data();
 
   setStoreName(data.storeName || '');
+  setSetupStoreName(data.storeName || '');
   setRole(data.role || 'owner');
 }
 
@@ -251,6 +252,8 @@ const handleLogout = async () => {
 
 const handleSaveStore = async () => {
   if (!user) return;
+
+  console.log('setupStoreName =', setupStoreName);
 
   try {
     await setDoc(
@@ -539,7 +542,8 @@ const handleLogin = (e: React.FormEvent) => {
             <div className="flex-1 p-8 overflow-y-auto">
               <header className="flex justify-between items-center mb-8">
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">IndoTech POS</h1>
+                  <h1 className="text-4xl font-bold text-slate-900">{storeName || 'IndoTech POS'}</h1>
+                  <p className="text-xs font-medium text-indigo-600">Powered by IndoTech</p>
                   <p className="text-slate-500 text-sm">Scan barcode atau ketik nama barang.</p>
                 </div>
                 <div className="relative w-80">
@@ -938,8 +942,8 @@ const handleLogin = (e: React.FormEvent) => {
 
         <input
           type="text"
-          value={storeName}
-          onChange={(e) => setStoreName(e.target.value)}
+          value={setupStoreName}
+          onChange={(e) => setSetupStoreName(e.target.value)}
           className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
         />
       </div>
@@ -971,6 +975,7 @@ const handleLogin = (e: React.FormEvent) => {
       </div>
 
       <button
+        onClick={handleSaveStore}
         className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all"
       >
         Simpan Perubahan

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">IndoTech POS</string>
+    <string name="title_activity_main">IndoTech POS</string>
+    <string name="package_name">com.indotech.pos</string>
+    <string name="custom_url_scheme">com.indotech.pos</string>
+</resources>

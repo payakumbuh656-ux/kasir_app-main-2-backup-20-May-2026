@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "118173796227",
+    "project_id": "indotechprogramming-id",
+    "storage_bucket": "indotechprogramming-id.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118173796227:android:f486978aedfe56db3598b6",
+        "android_client_info": {
+          "package_name": "com.indotech.pos"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "118173796227-fc1er57sr29gemocngjvk9i4uv9q44ak.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.indotech.pos",
+            "certificate_hash": "110a8beea324d668a80543bd697ab0cf813c6f6d"
+          }
+        },
+        {
+          "client_id": "118173796227-a1udpbo8herjkqojj2qqbrb428gvh7j6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAN98kWG3H2vDcjJ3i7hlJE5OV3NCLyiHw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "118173796227-a1udpbo8herjkqojj2qqbrb428gvh7j6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

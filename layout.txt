@@ -1,0 +1,1151 @@
+   900	                ? `Rp ${entry.value.toLocaleString("id-ID")}`
+   901	                : entry.value}
+   902	            </span>
+   903	          </div>
+   904	        ))}
+   905	      </div>
+   906	    );
+   907	  };
+   908	
+   909	  return (
+   910	    <div
+   911	      className={`flex h-screen overflow-hidden font-sans text-sm ${darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
+   912	        }`}
+   913	    >
+   914	      {/* Sidebar Navigation */}
+   915	      <aside
+   916	        className={`w-24 border-l flex flex-col flex-shrink-0 animate-in slide-in-from-right duration-300 ${darkMode
+   917	            ? "bg-slate-900 border-slate-800"
+   918	            : "bg-white border-slate-200"
+   919	          }`}
+   920	      >
+   921	        <div className="flex justify-center pt-6 pb-4">
+   922	          <div
+   923	            className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-all duration-300 ${darkMode
+   924	                ? "bg-indigo-600 shadow-[0_0_25px_2px_rgba(99,102,241,0.45)]"
+   925	                : "bg-indigo-600 shadow-lg shadow-indigo-200"
+   926	              }`}
+   927	          >
+   928	            <ShoppingCart size={24} />
+   929	          </div>
+   930	          </div>
+   931	          <div className={"flex flex-col items-center"}>
+   932	            <div
+   933	              className={`w-2 h-2 rounded-full ${user ? "bg-green-500 animate-pulse" : "bg-slate-300"}`}
+   934	            ></div>
+   935	
+   936	            <span
+   937	              className={`text-[8px] font-bold mt-1 uppercase leading-none ${darkMode ? "text-slate-500" : "text-slate-400"
+   938	                }`}
+   939	            >
+   940	              {user ? "Cloud" : "Offline"}
+   941	            </span>
+   942	
+   943	            <div className="text-[10px] text-red-500 mt-1">{role}</div>
+   944	          </div>
+   945	          <nav className="flex flex-col items-center space-y-6 flex-1 mt-6">
+   946	            <button
+   947	              onClick={() => setView("pos")}
+   948	              className={`p-3 rounded-xl transition-all ${view === "pos" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+   949	              title="Kasir"
+   950	            >
+   951	              <LayoutDashboard size={24} />
+   952	            </button>
+   953	            <button
+   954	              onClick={() => setView("stock")}
+   955	              className={`p-3 rounded-xl transition-all ${view === "stock" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+   956	              title="Stok Barang"
+   957	            >
+   958	              <Package size={24} />
+   959	            </button>
+   960	            <button
+   961	              onClick={() => setView("history")}
+   962	              className={`p-3 rounded-xl transition-all ${view === "history" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+   963	              title="Riwayat"
+   964	            >
+   965	              <History size={24} />
+   966	            </button>
+   967	
+   968	            {role === "owner" && (
+   969	              <button
+   970	                onClick={() => {
+   971	                  console.log("dashboard clicked");
+   972	                  setView("dashboard");
+   973	                }}
+   974	                className={`p-3 rounded-xl transition-all ${view === "dashboard"
+   975	                    ? "text-indigo-600 bg-indigo-50"
+   976	                    : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+   977	                  }`}
+   978	                title="Dashboard Penjualan"
+   979	              >
+   980	                <PieChart size={24} />
+   981	              </button>
+   982	            )}
+   983	
+   984	            <button
+   985	              onClick={() => setView("settings")}
+   986	              className={`p-3 rounded-xl transition-all ${view === "settings"
+   987	                  ? "text-indigo-600 bg-indigo-50"
+   988	                  : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+   989	                }`}
+   990	              title="Pengaturan"
+   991	            >
+   992	              <Settings size={24} />
+   993	            </button>
+   994	          </nav>
+   995	          <button
+   996	            onClick={handleLogout}
+   997	            className="p-3 mb-4 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+   998	          >
+   999	            <LogOut size={24} />
+  1000	          </button>
+  1001	      </aside>
+  1002	
+  1003	      {/* Main Content Area */}
+  1004	      <main className="flex-1 overflow-hidden flex flex-col">
+  1005	        {/* VIEW: POS / KASIR */}
+  1006	        {view === "pos" && (
+  1007	          <div className="flex flex-1 overflow-hidden">
+  1008	            <div className="flex-1 p-4 md:p-6 xl:p-8 overflow-y-auto">
+  1009	              <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
+  1010	                <div>
+  1011	                  <h1 className="text-2xl md:text-3xl xl:text-4xl font-bold text-slate-900">
+  1012	                    {storeName || "IndoTech POS"}
+  1013	                  </h1>
+  1014	                  <p className="text-xs font-medium text-indigo-600">
+  1015	                    Powered by IndoTech
+  1016	                  </p>
+  1017	                  <p className="text-slate-500 text-sm">
+  1018	                    Scan barcode atau ketik nama barang.
+  1019	                  </p>
+  1020	                </div>
+  1021	                <div className="relative w-80">
+  1022	                  <Barcode
+  1023	                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+  1024	                    size={18}
+  1025	                  />
+  1026	                  <input
+  1027	                    autoFocus
+  1028	                    type="text"
+  1029	                    placeholder="Scan Barcode / Cari Barang..."
+  1030	                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+  1031	                    value={posSearch}
+  1032	                    onChange={(e) => setPosSearch(e.target.value)}
+  1033	                  />
+  1034	                </div>
+  1035	              </header>
+  1036	
+  1037	              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+  1038	                {products
+  1039	                  .filter(
+  1040	                    (p) =>
+  1041	                      p.name.toLowerCase().includes(posSearch.toLowerCase()) ||
+  1042	                      p.barcode.includes(posSearch),
+  1043	                  )
+  1044	                  .map((product) => (
+  1045	                    <div
+  1046	                      key={product.id}
+  1047	                      onClick={() => addToCart(product)}
+  1048	                      className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-indigo-500 hover:shadow-xl transition-all cursor-pointer active:scale-95 group"
+  1049	                    >
+  1050	                      <div className="flex justify-between items-start mb-2">
+  1051	                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-md font-bold text-slate-400">
+  1052	                          {product.barcode}
+  1053	                        </span>
+  1054	                        <span
+  1055	                          className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${product.stock < 10 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}
+  1056	                        >
+  1057	                          Stock: {product.stock}
+  1058	                        </span>
+  1059	                      </div>
+  1060	                      <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors uppercase">
+  1061	                        {product.name}
+  1062	                      </h3>
+  1063	                      <p className="text-lg font-black text-slate-900 mt-2">
+  1064	                        Rp {product.price.toLocaleString("id-ID")}
+  1065	                      </p>
+  1066	                    </div>
+  1067	                  ))}
+  1068	              </div>
+  1069	            </div>
+  1070	
+  1071	            {/* Right Cart Summary */}
+  1072	            <aside
+  1073	              className={`w-96 border-l flex flex-col flex-shrink-0 animate-in slide-in-from-right duration-300 ${darkMode
+  1074	                  ? "bg-slate-900 border-slate-800"
+  1075	                  : "bg-white border-slate-200"
+  1076	                }`}
+  1077	            >
+  1078	              <div
+  1079	                className={`p-6 border-b ${darkMode ? `border-slate-800` : "border-slate-200"
+  1080	                  }`}
+  1081	              >
+  1082	                <h2 className="text-xl font-bold flex items-center">
+  1083	                  Keranjang{" "}
+  1084	                  <span className="ml-2 bg-indigo-100 text-indigo-600 text-xs px-2 py-1 rounded-full">
+  1085	                    {cart.length}
+  1086	                  </span>
+  1087	                </h2>
+  1088	              </div>
+  1089	              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+  1090	                {cart.length === 0 ? (
+  1091	                  <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
+  1092	                    <ShoppingCart size={48} className="mb-2" />
+  1093	                    <p className="text-sm">Siap melayani pembeli</p>
+  1094	                  </div>
+  1095	                ) : (
+  1096	                  cart.map((item) => (
+  1097	                    <div
+  1098	                      key={item.id}
+  1099	                      className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100"
+  1100	                    >
+  1101	                      <div className="flex-1 min-w-0">
+  1102	                        <h4 className="font-bold text-sm truncate uppercase">
+  1103	                          {item.name}
+  1104	                        </h4>
+  1105	                        <p className="text-xs text-slate-400">
+  1106	                          Rp {item.price.toLocaleString("id-ID")}
+  1107	                        </p>
+  1108	                      </div>
+  1109	                      <div className="flex items-center space-x-2">
+  1110	                        <button
+  1111	                          onClick={() => updateCartQty(item.id, -1)}
+  1112	                          className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
+  1113	                        >
+  1114	                          <Minus size={12} />
+  1115	                        </button>
+  1116	                        <span className="text-sm font-bold w-4 text-center">
+  1117	                          {item.quantity}
+  1118	                        </span>
+  1119	                        <button
+  1120	                          onClick={() => updateCartQty(item.id, 1)}
+  1121	                          className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
+  1122	                        >
+  1123	                          <Plus size={12} />
+  1124	                        </button>
+  1125	                      </div>
+  1126	                      <button
+  1127	                        onClick={() =>
+  1128	                          setCart((c) => c.filter((x) => x.id !== item.id))
+  1129	                        }
+  1130	                        className="text-slate-300 hover:text-red-500"
+  1131	                      >
+  1132	                        <Trash2 size={16} />
+  1133	                      </button>
+  1134	                    </div>
+  1135	                  ))
+  1136	                )}
+  1137	              </div>
+  1138	              <div className="p-6 bg-slate-900 text-white rounded-t-3xl">
+  1139	                <div className="flex justify-between text-sm text-slate-400 mb-4 font-bold">
+  1140	                  <span>TOTAL HARGA</span>
+  1141	                  <span className="text-white text-2xl font-black">
+  1142	                    Rp{" "}
+  1143	                    {cart
+  1144	                      .reduce((a, b) => a + b.price * b.quantity, 0)
+  1145	                      .toLocaleString("id-ID")}
+  1146	                  </span>
+  1147	                </div>
+  1148	                <button
+  1149	                  disabled={cart.length === 0}
+  1150	                  onClick={() => setIsCheckoutModalOpen(true)}
+  1151	                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+  1152	                >
+  1153	                  <CreditCard size={20} />
+  1154	                  <span>BAYAR / SELESAI</span>
+  1155	                </button>
+  1156	              </div>
+  1157	            </aside>
+  1158	          </div>
+  1159	        )}
+  1160	
+  1161	        {/* VIEW: STOCK MANAGEMENT */}
+  1162	        {view === "stock" && (
+  1163	          <div className="p-4 md:p-6 xl:p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
+  1164	            <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
+  1165	              <div>
+  1166	                <h1
+  1167	                  className={`text-2xl font-bold ${darkMode ? "text-indigo-400" : "text-indigo-600"
+  1168	                    }`}
+  1169	                >
+  1170	                  Gudang & Stok Barang
+  1171	                </h1>
+  1172	                <p
+  1173	                  className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"
+  1174	                    }`}
+  1175	                >
+  1176	                  Kelola katalog produk minimarket Anda.
+  1177	                </p>
+  1178	              </div>
+  1179	              <button
+  1180	                onClick={() => {
+  1181	                  setEditingProduct(null);
+  1182	                  setNewProduct({
+  1183	                    id: "",
+  1184	                    barcode: "",
+  1185	                    name: "",
+  1186	                    supplier: "",
+  1187	                    price: 0,
+  1188	                    modal: 0,
+  1189	                    stock: 0,
+  1190	                    category: "Umum",
+  1191	                  });
+  1192	                  setIsAddingProduct(true);
+  1193	                }}
+  1194	                className="w-full md:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+  1195	              >
+  1196	                <Plus size={20} />
+  1197	                <span>Tambah Barang Baru</span>
+  1198	              </button>
+  1199	            </header>
+  1200	
+  1201	            <div
+  1202	              className={`rounded-3xl borded overflow-hidden transition-all ${darkMode
+  1203	                  ? `bg-slate-900 border-slate-800`
+  1204	                  : `bg-white border-slate-200 shadow-sm`
+  1205	                }`}
+  1206	            >
+  1207	              <div className="overflow-x-auto">
+  1208	                <table className="w-full min-w-[1100px]">
+  1209	                  <thead className="bg-slate-50 border-b border-slate-200">
+  1210	                    <tr>
+  1211	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
+  1212	                        Barcode
+  1213	                      </th>
+  1214	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
+  1215	                        Nama Barang
+  1216	                      </th>
+  1217	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
+  1218	                        Supplier
+  1219	                      </th>
+  1220	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
+  1221	                        Kategori
+  1222	                      </th>
+  1223	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">
+  1224	                        Modal
+  1225	                      </th>
+  1226	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">
+  1227	                        Harga Jual
+  1228	                      </th>
+  1229	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">
+  1230	                        Stok
+  1231	                      </th>
+  1232	                      <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">
+  1233	                        Aksi
+  1234	                      </th>
+  1235	                    </tr>
+  1236	                  </thead>
+  1237	                  <tbody className="divide-y divide-slate-100 font-medium">
+  1238	                    {products.map((p) => (
+  1239	                      <tr
+  1240	                        key={p.id}
+  1241	                        className="hover:bg-slate-50/50 transition-colors"
+  1242	                      >
+  1243	                        <td className="px-6 py-4 font-mono text-xs text-slate-500">
+  1244	                          {p.barcode}
+  1245	                        </td>
+  1246	                        <td className="px-6 py-4 font-bold text-slate-900 uppercase">
+  1247	                          {p.name}
+  1248	                        </td>
+  1249	                        <td className="px-6 py-4 text-xs text-slate-500 uppercase">
+  1250	                          {p.supplier || "-"}
+  1251	                        </td>
+  1252	                        <td className="px-6 py-4">
+  1253	                          <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">
+  1254	                            {p.category}
+  1255	                          </span>
+  1256	                        </td>
+  1257	                        <td className="px-6 py-4 text-right font-bold text-slate-400">
+  1258	                          Rp {p.modal?.toLocaleString("id-ID")}
+  1259	                        </td>
+  1260	                        <td className="px-6 py-4 text-right font-black text-indigo-600">
+  1261	                          Rp {p.price.toLocaleString("id-ID")}
+  1262	                        </td>
+  1263	                        <td className="px-6 py-4 text-center">
+  1264	                          <span
+  1265	                            className={`px-3 py-1 rounded-full text-xs font-bold ${p.stock < 10 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}
+  1266	                          >
+  1267	                            {p.stock} pcs
+  1268	                          </span>
+  1269	                        </td>
+  1270	                        <td className="px-6 py-4 text-center">
+  1271	                          <div className="flex justify-center space-x-2">
+  1272	                            <button
+  1273	                              onClick={() => {
+  1274	                                setEditingProduct(p);
+  1275	                                setNewProduct(p);
+  1276	                                setIsAddingProduct(true);
+  1277	                              }}
+  1278	                              className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+  1279	                            >
+  1280	                              <Edit2 size={18} />
+  1281	                            </button>
+  1282	                            <button
+  1283	                              onClick={() => handleDeleteProduct(p.id)}
+  1284	                              className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+  1285	                            >
+  1286	                              <Trash2 size={18} />
+  1287	                            </button>
+  1288	                          </div>
+  1289	                        </td>
+  1290	                      </tr>
+  1291	                    ))}
+  1292	                  </tbody>
+  1293	                </table>
+  1294	              </div>
+  1295	            </div>
+  1296	
+  1297	            {/* Modal Tambah/Edit Produk */}
+  1298	            {isAddingProduct && (
+  1299	              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+  1300	                <div
+  1301	                  className={`w-full max-w-lg rounded-3xl p-4 md:p-6 xl:p-8 animate-in zoom-in-95 duration-200 ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white"
+  1302	                    }`}
+  1303	                >
+  1304	                  <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
+  1305	                    <h2 className="text-xl font-bold flex items-center">
+  1306	                      {editingProduct ? (
+  1307	                        <Edit2 size={20} className="mr-2" />
+  1308	                      ) : (
+  1309	                        <Plus size={20} className="mr-2" />
+  1310	                      )}
+  1311	                      {editingProduct ? "Edit Barang" : "Input Barang Baru"}
+  1312	                    </h2>
+  1313	                    <button
+  1314	                      onClick={() => setIsAddingProduct(false)}
+  1315	                      className="text-slate-400 hover:text-red-500"
+  1316	                    >
+  1317	                      <X size={24} />
+  1318	                    </button>
+  1319	                  </header>
+  1320	
+  1321	                  <div className="space-y-4">
+  1322	                    <div>
+  1323	                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1324	                        Kode Barcode
+  1325	                      </label>
+  1326	                      <div className="flex flex-col md:flex-row gap-2">
+  1327	                        <input
+  1328	                          type="text"
+  1329	                          className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+  1330	                          placeholder="Scan atau Ketik..."
+  1331	                          value={newProduct.barcode}
+  1332	                          onChange={(e) =>
+  1333	                            setNewProduct({
+  1334	                              ...newProduct,
+  1335	                              barcode: e.target.value,
+  1336	                            })
+  1337	                          }
+  1338	                        />
+  1339	                        <button
+  1340	                          type="button"
+  1341	                          onClick={() =>
+  1342	                            setNewProduct({
+  1343	                              ...newProduct,
+  1344	                              barcode: "IT" + Date.now().toString().slice(-10),
+  1345	                            })
+  1346	                          }
+  1347	                          className="px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-xs font-bold shadow-sm"
+  1348	                        >
+  1349	                          Generate
+  1350	                        </button>
+  1351	                      </div>
+  1352	                    </div>
+  1353	
+  1354	                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1355	                      <div>
+  1356	                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1357	                          Kategori
+  1358	                        </label>
+  1359	                        <select
+  1360	                          className="w-full px-4 py-3 bg-slate-50 border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+  1361	                          value={newProduct.category}
+  1362	                          onChange={(e) =>
+  1363	                            setNewProduct({
+  1364	                              ...newProduct,
+  1365	                              category: e.target.value,
+  1366	                            })
+  1367	                          }
+  1368	                        >
+  1369	                          <option>Minuman</option>
+  1370	                          <option>Makanan</option>
+  1371	                          <option>Snack</option>
+  1372	                          <option>Laptop/Elektronik</option>
+  1373	                          <option>Alat Tulis</option>
+  1374	                          <option>Lainnya</option>
+  1375	                        </select>
+  1376	                      </div>
+  1377	                      <div>
+  1378	                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1379	                          Nama Barang
+  1380	                        </label>
+  1381	                        <input
+  1382	                          type="text"
+  1383	                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+  1384	                          placeholder="Contoh: Aqua 600ml"
+  1385	                          value={newProduct.name}
+  1386	                          onChange={(e) =>
+  1387	                            setNewProduct({
+  1388	                              ...newProduct,
+  1389	                              name: e.target.value,
+  1390	                            })
+  1391	                          }
+  1392	                        />
+  1393	                      </div>
+  1394	                    </div>
+  1395	                    <div>
+  1396	                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1397	                        Supplier
+  1398	                      </label>
+  1399	                      <input
+  1400	                        type="text"
+  1401	                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+  1402	                        placeholder="Contoh: PT Sumber Alfaria Trijaya"
+  1403	                        value={newProduct.supplier}
+  1404	                        onChange={(e) =>
+  1405	                          setNewProduct({
+  1406	                            ...newProduct,
+  1407	                            supplier: e.target.value,
+  1408	                          })
+  1409	                        }
+  1410	                      />
+  1411	                    </div>
+  1412	                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1413	                      <div>
+  1414	                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1415	                          Harga Modal (Rp)
+  1416	                        </label>
+  1417	                        <input
+  1418	                          type="text"
+  1419	                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-500"
+  1420	                          value={
+  1421	                            newProduct.modal
+  1422	                              ? formatRupiah(newProduct.modal.toString())
+  1423	                              : ""
+  1424	                          }
+  1425	                          onChange={(e) =>
+  1426	                            setNewProduct({
+  1427	                              ...newProduct,
+  1428	                              modal: Number(e.target.value.replace(/\D/g, "")),
+  1429	                            })
+  1430	                          }
+  1431	                        />
+  1432	                      </div>
+  1433	                      <div>
+  1434	                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1435	                          Harga Jual (Rp)
+  1436	                        </label>
+  1437	                        <input
+  1438	                          type="text"
+  1439	                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+  1440	                          value={
+  1441	                            newProduct.price
+  1442	                              ? formatRupiah(newProduct.price.toString())
+  1443	                              : ""
+  1444	                          }
+  1445	                          onChange={(e) =>
+  1446	                            setNewProduct({
+  1447	                              ...newProduct,
+  1448	                              price: Number(e.target.value.replace(/\D/g, "")),
+  1449	                            })
+  1450	                          }
+  1451	                        />
+  1452	                      </div>
+  1453	                    </div>
+  1454	                    <div>
+  1455	                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+  1456	                        Jumlah Stok
+  1457	                      </label>
+  1458	                      <input
+  1459	                        type="text"
+  1460	                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+  1461	                        value={newProduct.stock}
+  1462	                        onChange={(e) =>
+  1463	                          setNewProduct({
+  1464	                            ...newProduct,
+  1465	                            stock: parseInt(e.target.value) || 0,
+  1466	                          })
+  1467	                        }
+  1468	                      />
+  1469	                    </div>
+  1470	                    <button
+  1471	                      onClick={handleSaveProduct}
+  1472	                      className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-indigo-100 transition-all"
+  1473	                    >
+  1474	                      <Save size={20} />
+  1475	                      <span>Simpan Ke Database</span>
+  1476	                    </button>
+  1477	                  </div>
+  1478	                </div>
+  1479	              </div>
+  1480	            )}
+  1481	          </div>
+  1482	        )}
+  1483	
+  1484	        {/* VIEW: HISTORY TRANSAKSI */}
+  1485	        {view === "history" && (
+  1486	          <div className="p-8 overflow-y-auto flex-1 animate-in slide-in-from-bottom duration-500">
+  1487	            <header className="mb-8">
+  1488	              <h1 className="text-2xl font-bold text-slate-900">
+  1489	                Riwayat Penjualan
+  1490	              </h1>
+  1491	              <p className="text-slate-500 text-sm">
+  1492	                Semua transaksi yang sudah selesai.
+  1493	              </p>
+  1494	            </header>
+  1495	
+  1496	            <div className="space-y-4">
+  1497	              {transactions.map((t) => (
+  1498	                <div
+  1499	                  className={`p-4 md:p-6 rounded-3xl border transition-all ${darkMode
+  1500	                      ? "bg-slate-900 border-slate-800"
+  1501	                      : "bg-white border-slate-200"
+  1502	                    }`}
+  1503	                >
+  1504	                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  1505	                    <div className="flex items-center space-x-2 mb-1">
+  1506	                      <span className="text-xs font-bold text-slate-400">
+  1507	                        {t.date}
+  1508	                      </span>
+  1509	                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+  1510	                        ID: {t.id.slice(-6)}
+  1511	                      </span>
+  1512	                    </div>
+  1513	                    <p className="text-sm font-bold text-slate-900 uppercase">
+  1514	                      {t.items
+  1515	                        .map((it: any) => `${it.name} (x${it.quantity})`)
+  1516	                        .join(", ")}
+  1517	                    </p>
+  1518	                    <div className="flex space-x-4 mt-2 text-[10px] font-bold uppercase text-slate-400">
+  1519	                      <span>
+  1520	                        Tunai: Rp {t.paidAmount?.toLocaleString("id-ID")}
+  1521	                      </span>
+  1522	                      <span>
+  1523	                        Kembali: Rp {t.changeAmount?.toLocaleString("id-ID")}
+  1524	                      </span>
+  1525	                    </div>
+  1526	                  </div>
+  1527	                  <div className="text-right">
+  1528	                    <p className="text-xl font-black text-indigo-600">
+  1529	                      Rp {t.total.toLocaleString("id-ID")}
+  1530	                    </p>
+  1531	                    <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold">
+  1532	                      LUNAS
+  1533	                    </span>
+  1534	                    <button
+  1535	                      onClick={() => {
+  1536	                        setLastTransaction(t);
+  1537	                        setIsReceiptModalOpen(true);
+  1538	                      }}
+  1539	                      className="ml-4 p-2 text-slate-400 hover:text-indigo-600 transition-all opacity-0 group-hover:opacity-100"
+  1540	                      title="Cetak Ulang Struk"
+  1541	                    >
+  1542	                      <Printer size={16} />
+  1543	                    </button>
+  1544	                  </div>
+  1545	                </div>
+  1546	              ))}
+  1547	              {transactions.length === 0 && (
+  1548	                <div className="py-20 text-center text-slate-400">
+  1549	                  Belum ada transaksi hari ini.
+  1550	                </div>
+  1551	              )}
+  1552	            </div>
+  1553	          </div>
+  1554	        )}
+  1555	
+  1556	        {view === "dashboard" && (
+  1557	          <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
+  1558	            <header className="mb-8">
+  1559	              <div className="flex justify-between items-center mb-6">
+  1560	                <select className="px-4 py-2 rounded-xl border border-slate-200 bg-white font-semibold shadow-sm">
+  1561	                  <option>Semua Cabang</option>
+  1562	                </select>
+  1563	
+  1564	                <select
+  1565	                  value={ownerPeriod}
+  1566	                  onChange={(e) => setOwnerPeriod(e.target.value)}
+  1567	                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white font-semibold shadow-sm"
+  1568	                >
+  1569	                  <option value="today">Hari Ini</option>
+  1570	                  <option value="month">Bulan Ini</option>
+  1571	                  <option value="year">Tahun Ini</option>
+  1572	                </select>
+  1573	              </div>
+  1574	
+  1575	              <div>
+  1576	                <h1
+  1577	                  className={`text-4xl font-black ${darkMode ? "text-white" : "text-indigo-600"}`}
+  1578	                >
+  1579	                  Dashboard Penjualan
+  1580	                </h1>
+  1581	
+  1582	                <p
+  1583	                  className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}
+  1584	                >
+  1585	                  Pantau performa seluruh outlet secara realtime.
+  1586	                </p>
+  1587	              </div>
+  1588	            </header>
+  1589	
+  1590	            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
+  1591	              <div
+  1592	                className={`rounded-3xl border p-4 transition-all duration-300 hover:shadow-lg ${darkMode
+  1593	                    ? "bg-slate-900 border-slate-800"
+  1594	                    : "bg-white border-slate-200"
+  1595	                  }`}
+  1596	              >
+  1597	                <div className="flex items-center gap-5">
+  1598	                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg flex-shrink-0">
+  1599	                    <DollarSign size={18} className="text-white" />
+  1600	                  </div>
+  1601	
+  1602	                  <div className="flex-1">
+  1603	                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1604	                      {ownerPeriod === "today"
+  1605	                        ? "Penjualan Hari Ini"
+  1606	                        : ownerPeriod === "month"
+  1607	                          ? "Penjualan Bulan Ini"
+  1608	                          : "Penjualan Tahun Ini"}
+  1609	                    </p>
+  1610	
+  1611	                    <h2 className="text-[22px] leading-none font-black text-indigo-600 mt-1 whitespace-nowrap">
+  1612	                      Rp{" "}
+  1613	                      {(ownerPeriod === "today"
+  1614	                        ? todaySales
+  1615	                        : ownerPeriod === "month"
+  1616	                          ? monthSales
+  1617	                          : transactions.reduce((a, b) => a + b.total, 0)
+  1618	                      ).toLocaleString("id-ID")}
+  1619	                    </h2>
+  1620	
+  1621	                    <div className="flex items-center gap-2 mt-3">
+  1622	                      {salesGrowth > 0 ? (
+  1623	                        <>
+  1624	                          <span className="text-green-500 font-bold text-sm">
+  1625	                            ▲ {salesGrowth.toFixed(1)}%
+  1626	                          </span>
+  1627	                          <span className="text-slate-400 text-sm">
+  1628	                            dari kemarin
+  1629	                          </span>
+  1630	                        </>
+  1631	                      ) : salesGrowth < 0 ? (
+  1632	                        <>
+  1633	                          <span className="text-red-500 font-bold text-sm">
+  1634	                            ▼ {Math.abs(salesGrowth).toFixed(1)}%
+  1635	                          </span>
+  1636	                          <span className="text-slate-400 text-sm">
+  1637	                            dari kemarin
+  1638	                          </span>
+  1639	                        </>
+  1640	                      ) : (
+  1641	                        <>
+  1642	                          <span className="text-slate-400 font-bold text-sm">
+  1643	                            0%
+  1644	                          </span>
+  1645	                          <span className="text-slate-400 text-sm">
+  1646	                            dari kemarin
+  1647	                          </span>
+  1648	                        </>
+  1649	                      )}
+  1650	                    </div>
+  1651	                  </div>
+  1652	                </div>
+  1653	              </div>
+  1654	              <div
+  1655	                className={`rounded-3xl border p-4 border transition-all duration-300 ${darkMode
+  1656	                    ? "bg-slate-900 border-slate-800"
+  1657	                    : "bg-white border-slate-200"
+  1658	                  }`}
+  1659	              >
+  1660	                <div className="flex items-center gap-5">
+  1661	                  <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shadow-lg flex-shrink-0">
+  1662	                    <BarChart3 size={18} className="text-white" />
+  1663	                  </div>
+  1664	
+  1665	                  <div className="flex-1">
+  1666	                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1667	                      Total Transaksi
+  1668	                    </p>
+  1669	
+  1670	                    <h2 className="text-[22px] leading-none font-black text-indigo-600 mt-1">
+  1671	                      {totalTransactions}
+  1672	                    </h2>
+  1673	
+  1674	                    <div className="flex items-center gap-2 mt-3">
+  1675	                      {transactionGrowth > 0 ? (
+  1676	                        <>
+  1677	                          <span className="text-green-500 font-bold text-sm">
+  1678	                            ▲ {transactionGrowth.toFixed(1)}%
+  1679	                          </span>
+  1680	
+  1681	                          <span className="text-slate-400 text-sm">
+  1682	                            dari kemarin
+  1683	                          </span>
+  1684	                        </>
+  1685	                      ) : transactionGrowth < 0 ? (
+  1686	                        <>
+  1687	                          <span className="text-red-500 font-bold text-sm">
+  1688	                            ▼ {Math.abs(transactionGrowth).toFixed(1)}%
+  1689	                          </span>
+  1690	
+  1691	                          <span className="text-slate-400 text-sm">
+  1692	                            dari kemarin
+  1693	                          </span>
+  1694	                        </>
+  1695	                      ) : (
+  1696	                        <>
+  1697	                          <span className="text-slate-400 font-bold text-sm">
+  1698	                            0%
+  1699	                          </span>
+  1700	
+  1701	                          <span className="text-slate-400 text-sm">
+  1702	                            dari kemarin
+  1703	                          </span>
+  1704	                        </>
+  1705	                      )}
+  1706	                    </div>
+  1707	                  </div>
+  1708	                </div>
+  1709	              </div>
+  1710	
+  1711	              {/* Total Keuntungan */}
+  1712	              <div
+  1713	                className={`rounded-3xl border p-4 transition-all duration-300 ${darkMode
+  1714	                    ? "bg-slate-900 border-slate-800"
+  1715	                    : "bg-white border-slate-200"
+  1716	                  }`}
+  1717	              >
+  1718	                <div className="flex items-center gap-5">
+  1719	                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg flex-shrink-0">
+  1720	                    <TrendingUp size={18} className="text-white" />
+  1721	                  </div>
+  1722	
+  1723	                  <div className="flex-1">
+  1724	                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1725	                      Total Keuntungan
+  1726	                    </p>
+  1727	
+  1728	                    <h2 className="text-[22px] leading-none font-black text-green-600 mt-1 whitespace-nowrap">
+  1729	                      Rp {totalProfit.toLocaleString("id-ID")}
+  1730	                    </h2>
+  1731	
+  1732	                    <div className="flex items-center gap-2 mt-3">
+  1733	                      {profitGrowth > 0 ? (
+  1734	                        <>
+  1735	                          <span className="text-green-500 font-bold text-sm">
+  1736	                            ▲ {profitGrowth.toFixed(1)}%
+  1737	                          </span>
+  1738	
+  1739	                          <span className="text-slate-400 text-sm">
+  1740	                            dari kemarin
+  1741	                          </span>
+  1742	                        </>
+  1743	                      ) : profitGrowth < 0 ? (
+  1744	                        <>
+  1745	                          <span className="text-red-500 font-bold text-sm">
+  1746	                            ▼ {Math.abs(profitGrowth).toFixed(1)}%
+  1747	                          </span>
+  1748	
+  1749	                          <span className="text-slate-400 text-sm">
+  1750	                            dari kemarin
+  1751	                          </span>
+  1752	                        </>
+  1753	                      ) : (
+  1754	                        <>
+  1755	                          <span className="text-slate-400 font-bold text-sm">
+  1756	                            0%
+  1757	                          </span>
+  1758	
+  1759	                          <span className="text-slate-400 text-sm">
+  1760	                            dari kemarin
+  1761	                          </span>
+  1762	                        </>
+  1763	                      )}
+  1764	                    </div>
+  1765	                  </div>
+  1766	                </div>
+  1767	              </div>
+  1768	
+  1769	              <div
+  1770	                className={`rounded-3xl border p-4 transition-all duration-300 ${darkMode
+  1771	                    ? "bg-slate-900 border-slate-800"
+  1772	                    : "bg-white border-slate-200"
+  1773	                  }`}
+  1774	              >
+  1775	                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1776	                  Jumlah Produk
+  1777	                </p>
+  1778	
+  1779	                <h2 className="text-[36px] font-black text-indigo-600 mt-2">
+  1780	                  {products.length}
+  1781	                </h2>
+  1782	              </div>
+  1783	
+  1784	              <div
+  1785	                className={`rounded-3xl border p-4 transition-all duration-300 ${darkMode
+  1786	                    ? "bg-slate-900 border-slate-800"
+  1787	                    : "bg-white border-slate-200"
+  1788	                  }`}
+  1789	              >
+  1790	                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1791	                  Rata-rata Transaksi
+  1792	                </p>
+  1793	
+  1794	                <h2 className="text-[36px] font-black text-indigo-600 mt-2">
+  1795	                  Rp {averageTransaction.toLocaleString("id-ID")}
+  1796	                </h2>
+  1797	              </div>
+  1798	
+  1799	              <div
+  1800	                className={`rounded-3xl border p-4 transition-all duration-300 ${darkMode
+  1801	                    ? "bg-slate-900 border-slate-800"
+  1802	                    : "bg-white border-slate-200"
+  1803	                  }`}
+  1804	              >
+  1805	                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+  1806	                  Outlet Aktif
+  1807	                </p>
+  1808	
+  1809	                <h2 className="text-[36px] font-black text-green-600 mt-2">
+  1810	                  1
+  1811	                </h2>
+  1812	              </div>
+  1813	            </div>
+  1814	
+  1815	            <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+  1816	              <h2 className="text-xl font-bold text-indigo-600 mb-4">
+  1817	                Grafik Penjualan 7 Hari Terakhir
+  1818	              </h2>
+  1819	
+  1820	              <div className="h-[280px]">
+  1821	                <ResponsiveContainer width="100%" height="100%">
+  1822	                  <LineChart data={salesChartData}>
+  1823	                    <CartesianGrid strokeDasharray="2 6" stroke="#f1f5f9" />
+  1824	
+  1825	                    <XAxis dataKey="day" />
+  1826	
+  1827	                    <YAxis
+  1828	                      tickFormatter={(value) =>
+  1829	                        `Rp${(value / 1000000).toFixed(0)}jt`
+  1830	                      }
+  1831	                    />
+  1832	
+  1833	                    <Tooltip content={<CustomTooltip />} />
+  1834	
+  1835	                    <Legend />
+  1836	
+  1837	                    <Line
+  1838	                      type="natural"
+  1839	                      dataKey="sales"
+  1840	                      stroke="#4f46e5"
+  1841	                      strokeWidth={3}
+  1842	                      name="Penjualan"
+  1843	                      dot={{ r: 3 }}
+  1844	                      activeDot={{ r: 6 }}
+  1845	                    />
+  1846	
+  1847	                    <Line
+  1848	                      type="natural"
+  1849	                      dataKey="trx"
+  1850	                      stroke="#10b981"
+  1851	                      strokeWidth={3}
+  1852	                      name="Transaksi"
+  1853	                      dot={{ r: 3 }}
+  1854	                      activeDot={{ r: 6 }}
+  1855	                    />
+  1856	                  </LineChart>
+  1857	                </ResponsiveContainer>
+  1858	              </div>
+  1859	            </div>
+  1860	
+  1861	            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+  1862	              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+  1863	                <h2 className="text-xl font-bold text-indigo-600 mb-4">
+  1864	                  🏆 Top Produk Terlaris
+  1865	                </h2>
+  1866	
+  1867	                <div className="space-y-4">
+  1868	                  {topProducts.slice(0, 3).map((product, index) => (
+  1869	                    <div
+  1870	                      key={index}
+  1871	                      className="flex justify-between items-center border-b border-slate-100 pb-3"
+  1872	                    >
+  1873	                      <div>
+  1874	                        <p
+  1875	                          className="font-semibold text-slate-800"
+  1876	                          title={product.name}
+  1877	                        >
+  1878	                          #{index + 1}{" "}
+  1879	                          {product.name.length > 25
+  1880	                            ? product.name.substring(0, 25) + "..."
+  1881	                            : product.name}
+  1882	                        </p>
+  1883	                      </div>
+  1884	
+  1885	                      <span className="font-bold text-indigo-600">
+  1886	                        {product.sold}x
+  1887	                      </span>
+  1888	                    </div>
+  1889	                  ))}
+  1890	                </div>
+  1891	              </div>
+  1892	
+  1893	              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+  1894	                <h2 className="text-xl font-bold text-red-600 mb-4">
+  1895	                  ⚠ Stok Menipis
+  1896	                </h2>
+  1897	
+  1898	                <div className="space-y-4">
+  1899	                  {lowStockProducts.length === 0 ? (
+  1900	                    <p className="text-slate-500">Semua stok aman 👍</p>
+  1901	                  ) : (
+  1902	                    lowStockProducts.slice(0, 3).map((product) => (
+  1903	                      <div
+  1904	                        key={product.id}
+  1905	                        className="flex justify-between items-center border-b border-slate-100 pb-3"
+  1906	                      >
+  1907	                        <span
+  1908	                          className="font-semibold text-slate-800"
+  1909	                          title={product.name}
+  1910	                        >
+  1911	                          {product.name.length > 25
+  1912	                            ? product.name.substring(0, 25) + "..."
+  1913	                            : product.name}
+  1914	                        </span>
+  1915	
+  1916	                        <span className="font-bold text-red-500">
+  1917	                          {product.stock}
+  1918	                        </span>
+  1919	                      </div>
+  1920	                    ))
+  1921	                  )}
+  1922	                </div>
+  1923	              </div>
+  1924	            </div>
+  1925	          </div>
+  1926	        )}
+  1927	
+  1928	        {view === "settings" && (
+  1929	          <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
+  1930	            <header className="mb-8">
+  1931	              <h1 className="text-2xl font-bold text-indigo-600">
+  1932	                Pengaturan Toko
+  1933	              </h1>
+  1934	              <p className="text-slate-500 text-sm">
+  1935	                Kelola profil dan identitas toko Anda.
+  1936	              </p>
+  1937	            </header>
+  1938	
+  1939	            <div
+  1940	              className={`rounded-3xl border p-4 md:p-6 xl:p-8 max-w-3xl
+  1941	                ? "bg-slate-900 border-slate-800"
+  1942	                : "bg-white border-slate-200 shadow-sm"
+  1943	                }`}
+  1944	            >
+  1945	              <div className="mb-6">
+  1946	                <label className="block text-sm font-bold text-slate-600 mb-2">
+  1947	                  Nama Toko
+  1948	                </label>
+  1949	
+  1950	                <input
+  1951	                  type="text"
+  1952	                  value={setupStoreName}
+  1953	                  onChange={(e) => setSetupStoreName(e.target.value)}
+  1954	                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+  1955	                />
+  1956	              </div>
+  1957	
+  1958	              <div className="mb-6">
+  1959	                <label className="block text-sm font-bold text-slate-600 mb-2">
+  1960	                  Logo Toko
+  1961	                </label>
+  1962	
+  1963	                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 bg-slate-50 text-center">
+  1964	                  <p className="text-sm font-medium text-slate-500">
+  1965	                    Upload Logo PNG
+  1966	                  </p>
+  1967	
+  1968	                  <p className="text-xs text-slate-400 mt-1">
+  1969	                    Maksimal 1MB • PNG Only
+  1970	                  </p>
+  1971	                </div>
+  1972	              </div>
+  1973	
+  1974	              <div className="mb-6">
+  1975	                <label className="block text-sm font-bold text-slate-600 mb-2">
+  1976	                  Email Akun
+  1977	                </label>
+  1978	
+  1979	                <input
+  1980	                  type="text"
+  1981	                  value={user?.email || ""}
+  1982	                  disabled
+  1983	                  className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl"
+  1984	                />
+  1985	              </div>
+  1986	
+  1987	              <div className="mb-8">
+  1988	                <label className="block text-sm font-bold text-slate-600 mb-2">
+  1989	                  Role
+  1990	                </label>
+  1991	
+  1992	                <input
+  1993	                  type="text"
+  1994	                  value={role}
+  1995	                  disabled
+  1996	                  className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl"
+  1997	                />
+  1998	              </div>
+  1999	
+  2000	              <div className="mb-8">
+  2001	                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+  2002	                  <div>
+  2003	                    <h3 className="font-bold text-slate-900">Dark Mode</h3>
+  2004	
+  2005	                    <p className="text-sm text-slate-500">
+  2006	                      Tampilan gelap yang nyaman di mata.
+  2007	                    </p>
+  2008	                  </div>
+  2009	
+  2010	                  <button
+  2011	                    onClick={() => setDarkMode(!darkMode)}
+  2012	                    className={`relative w-14 h-8 rounded-full transition-all duration-300 ${darkMode ? "bg-indigo-600" : "bg-slate-300"
+  2013	                      }`}
+  2014	                  >
+  2015	                    <span
+  2016	                      className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all duration-300 ${darkMode ? "right-1" : "left-1"
+  2017	                        }`}
+  2018	                    />
+  2019	                  </button>
+  2020	                </div>
+  2021	              </div>
+  2022	
+  2023	              <button
+  2024	                onClick={handleSaveStore}
+  2025	                className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all"
+  2026	              >
+  2027	                Simpan Perubahan
+  2028	              </button>
+  2029	            </div>
+  2030	          </div>
+  2031	        )}
+  2032	      </main>
+  2033	
+  2034	      {toast && (
+  2035	        <div
+  2036	          className={`fixed top-8 right-8 z-50
+  2037	      bg-slate-900/95 backdrop-blur-md
+  2038	      text-white
+  2039	      px-10 py-6
+  2040	      rounded-3xl
+  2041	      shadow-[0_20px_50px_rgba(0,0,0,0.35)]
+  2042	      border border-slate-700
+  2043	      transform transition-all duration-500 ease-out
+  2044	      ${isToastVisible
+  2045	              ? "translate-y-0 scale-100 opacity-100"
+  2046	              : "-translate-y-8 scale-95 opacity-0"
+  2047	            }
+  2048	    `}
+  2049	        >
+  2050	          <div className="flex items-center gap-4">

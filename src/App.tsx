@@ -911,7 +911,7 @@ export default function App() {
 
   return (
     <div
-      className={`flex h-screen overflow-hidden font-sans text-sm ${
+      className={`flex min-h-screen font-sans text-sm ${
         darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
       }`}
     >
@@ -1010,7 +1010,7 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 overflow-y-auto flex flex-col">
         {/* VIEW: POS / KASIR */}
         {view === "pos" && (
           <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">

@@ -35,7 +35,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { db, auth, googleProvider } from "./lib/firebase";
-import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 import { Capacitor } from "@capacitor/core";
 
 import {
@@ -150,21 +149,6 @@ export default function App() {
   );
 
   const now = new Date();
-
-  useEffect(() => {
-    const initGoogle = async () => {
-      try {
-        await GoogleSignIn.initialize({
-          clientId:
-            "118173796227-a1udpbo8herjkqojj2qqbrb428gvh7j6.apps.googleusercontent.com",
-        });
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    initGoogle();
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("theme", darkMode ? "dark" : "light");
@@ -506,28 +490,13 @@ export default function App() {
     try {
       setIsLoggingIn(true);
 
-      const result = await GoogleSignIn.signIn();
+      const provider = new GoogleAuthProvider();
 
-      alert("SIGN IN SUCCESS");
-
-      alert(JSON.stringify(result, null, 2));
-
-      if (!result.idToken) {
-        throw new Error("ID Token tidak ditemukan");
-      }
-
-      const credential = GoogleAuthProvider.credential(result.idToken);
-
-      await signInWithCredential(auth, credential);
-
-      alert("FIREBASE LOGIN SUCCESS");
+      await signInWithPopup(auth, provider);
 
       showToast("Berhasil login dengan Google!");
-    } catch (error: any) {
-      alert("MESSAGE = " + error?.message + "\n\nCODE = " + error?.code);
-
+    } catch (error) {
       console.error(error);
-
       showToast("Gagal login Google");
     } finally {
       setIsLoggingIn(false);
@@ -862,7 +831,6 @@ export default function App() {
           </div>
           <button
             onClick={() => {
-              alert("BUTTON WORKING");
               handleGoogleLogin();
             }}
             className="w-full py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold transition-all flex items-center justify-center space-x-2 shadow-sm"

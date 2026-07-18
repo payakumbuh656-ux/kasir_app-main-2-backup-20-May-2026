@@ -24,6 +24,10 @@ ipcMain.handle("ping", async () => {
   return "pong";
 });
 
+ipcMain.handle("system:platform", async () => {
+  return process.platform;
+});
+
 app.whenReady().then(createWindow);
 
 app.on("window-all-closed", () => {

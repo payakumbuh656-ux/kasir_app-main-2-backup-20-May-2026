@@ -450,8 +450,10 @@ export default function App() {
       if (!window.electron) return;
 
       const result = await window.electron.ping();
-
       console.log("Electron IPC:", result);
+
+      const platform = await window.electron.system.platform();
+      console.log("Platform:", platform);
     }
 
     testElectron();

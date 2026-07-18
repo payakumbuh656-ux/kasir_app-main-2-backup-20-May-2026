@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 
 function createWindow() {
@@ -7,6 +7,7 @@ function createWindow() {
     height: 900,
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -18,6 +19,10 @@ function createWindow() {
     win.loadFile(path.join(__dirname, "../dist-react/index.html"));
   }
 }
+
+ipcMain.handle("ping", async () => {
+  return "pong";
+});
 
 app.whenReady().then(createWindow);
 

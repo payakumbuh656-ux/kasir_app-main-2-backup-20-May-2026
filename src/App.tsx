@@ -446,6 +446,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    async function testElectron() {
+      if (!window.electron) return;
+
+      const result = await window.electron.ping();
+
+      console.log("Electron IPC:", result);
+    }
+
+    testElectron();
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
 
     const unsubProducts = onSnapshot(

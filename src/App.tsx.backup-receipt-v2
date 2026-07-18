@@ -9,7 +9,6 @@ import ProductImagePanel from "./components/ProductImagePanel";
 import PageContainer from "./components/PageContainer";
 import Receipt from "./modules/receipt/Receipt";
 import { formatReceipt } from "./modules/receipt/receiptFormatter";
-import { PrinterService } from "./modules/receipt/printer/PrinterService";
 import {
   ResponsiveContainer,
   LineChart,
@@ -1460,7 +1459,7 @@ export default function App() {
     : null;
 
   const handlePrintReceipt = () => {
-    PrinterService.print();
+    window.print();
   };
 
   return (
@@ -3264,27 +3263,11 @@ export default function App() {
 
       {/* Receipt Modal */}
       {isReceiptModalOpen && lastTransaction && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setIsReceiptModalOpen(false)}
-          />
-          <div className="absolute right-0 top-0 h-full w-full max-w-[390px] bg-white shadow-2xl flex flex-col">
-            <div className="border-b px-6 py-5">
-              <h2 className="text-xl font-black text-indigo-600">
-                Pembayaran Berhasil
-              </h2>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="receipt-print bg-white w-full max-w-sm rounded-lg p-8 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            {receiptData && <Receipt receipt={receiptData} />}
 
-              <p className="text-sm text-slate-500 mt-1">
-                Silakan periksa struk sebelum mencetak.
-              </p>
-            </div>
-
-            <div className="receipt-container flex-1 overflow-y-auto px-6 py-6">
-              <Receipt receipt={receiptData} />
-            </div>
-
-            <div className="border-t p-6 flex gap-3">
+            <div className="flex space-x-2 mt-8">
               <button
                 onClick={() => setIsReceiptModalOpen(false)}
                 className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold transition-all"

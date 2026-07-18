@@ -8,6 +8,10 @@ declare global {
       system: {
         platform: () => Promise<string>;
       };
+
+      printer: {
+        getPrinters: () => Promise<Electron.PrinterInfo[]>;
+      }
     };
   }
 }

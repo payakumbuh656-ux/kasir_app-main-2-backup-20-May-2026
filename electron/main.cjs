@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 
+let mainWindow;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     autoHideMenuBar: true,
@@ -14,9 +16,9 @@ function createWindow() {
   });
 
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:3000");
+    mainWindow.loadURL("http://localhost:3000");
   } else {
-    win.loadFile(path.join(__dirname, "../dist-react/index.html"));
+    mainWindow.loadFile(path.join(__dirname, "../dist-react/index.html"));
   }
 }
 
@@ -26,6 +28,10 @@ ipcMain.handle("ping", async () => {
 
 ipcMain.handle("system:platform", async () => {
   return process.platform;
+});
+
+ipcMain.handle("printer:getPrinters", async () => {
+  return await mainWindow.webContents.getPrintersAsync();
 });
 
 app.whenReady().then(createWindow);

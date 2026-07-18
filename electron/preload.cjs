@@ -6,4 +6,8 @@ contextBridge.exposeInMainWorld("electron", {
   system: {
     platform: () => ipcRenderer.invoke("system:platform"),
   },
+
+  printer: {
+    getPrinters: () => ipcRenderer.invoke("printer:getPrinters"),
+  },
 });

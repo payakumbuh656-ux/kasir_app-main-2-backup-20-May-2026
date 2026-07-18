@@ -454,6 +454,9 @@ export default function App() {
 
       const platform = await window.electron.system.platform();
       console.log("Platform:", platform);
+
+      const printers = await window.electron.printer.getPrinters();
+      console.log("Printers:", printers);
     }
 
     testElectron();

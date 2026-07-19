@@ -1,9 +1,24 @@
+# Dependencies
 node_modules/
+
+# Build
 build/
 dist/
+dist-react/
+release/
+
+# Coverage
 coverage/
+
+# macOS
 .DS_Store
+
+# Logs
 *.log
+
+# Environment
 .env*
 !.env.example
+
+# Deploy
 .vercel

@@ -6,6 +6,7 @@ import SettingsMenu from "./SettingsMenu";
 import StoreSettings from "./StoreSettings";
 import PrinterSettings from "./PrinterSettings";
 import StaffSettings from "./StaffSettings";
+import SoftwareUpdate from "./SoftwareUpdate";
 import SecuritySettings from "./SecuritySettings";
 
 interface SettingsPageProps {
@@ -70,6 +71,8 @@ export default function SettingsPage({
       {settingsTab === "staff" && <StaffSettings />}
 
       {settingsTab === "security" && <SecuritySettings />}
+
+      {settingsTab === "update" && <SoftwareUpdate />}
     </>
   );
 }

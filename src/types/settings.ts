@@ -2,4 +2,5 @@ export type SettingsTab =
   | "store"
   | "printer"
   | "staff"
-  | "security";
+  | "security"
+  | "update";

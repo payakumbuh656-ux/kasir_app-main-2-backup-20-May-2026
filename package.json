@@ -1,7 +1,7 @@
 {
   "name": "indotech-pos",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
+  "private": false,
   "main": "electron/main.cjs",
   "type": "commonjs",
   "scripts": {
@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.4.1",
     "@capawesome/capacitor-google-sign-in": "^0.1.2",
     "@monaco-editor/react": "^4.7.0",
+    "electron-updater": "^6.8.9",
     "firebase": "^12.13.0",
     "lucide-react": "^1.16.0",
     "react": "^19.0.1",
@@ -37,11 +38,42 @@
   "build": {
     "appId": "com.indotech.pos",
     "productName": "IndoTech POS",
+    "icon": "build/icon.png",
+    "generateUpdatesFilesForAllChannels": true,
+    "directories": {
+      "output": "release"
+    },
+    "artifactName": "${productName}-${version}-${os}.${ext}",
     "files": [
       "electron/**/*",
-      "dist-react/**/*"
+      "dist-react/**/*",
+      "package.json"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "payakumbuh656-ux",
+        "repo": "kasir_app-main-2-backup-20-May-2026"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
     "mac": {
+      "icon": "build/icon.icns",
       "target": "dmg"
     }
   }

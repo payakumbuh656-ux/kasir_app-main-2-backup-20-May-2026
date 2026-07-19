@@ -1,10 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  Printer,
-  ShieldCheck,
-  Store,
-  Users,
-} from "lucide-react";
+import { Printer, ShieldCheck, Store, Users, Download } from "lucide-react";
 
 import type { SettingsTab } from "../../types/settings";
 
@@ -39,5 +34,11 @@ export const SETTINGS_MENUS: SettingsMenuItem[] = [
     title: "Security",
     subtitle: "PIN & Hak Akses",
     icon: ShieldCheck,
+  },
+  {
+    id: "update",
+    title: "Software Update",
+    subtitle: "Versi & Pembaruan",
+    icon: Download,
   },
 ];

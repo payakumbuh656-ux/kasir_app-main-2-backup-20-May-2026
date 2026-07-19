@@ -15,6 +15,7 @@ import SettingsMenu from "./components/settings/SettingsMenu";
 import PrinterSettings from "./components/settings/PrinterSettings";
 import StaffSettings from "./components/settings/StaffSettings";
 import SecuritySettings from "./components/settings/SecuritySettings";
+import SettingsPage from "./components/settings/SettingsPage";
 import {
   ResponsiveContainer,
   LineChart,
@@ -2965,36 +2966,17 @@ export default function App() {
 
         {view === "settings" && (
           <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
-            <header className="mb-8">
-              <h1 className="text-3xl font-bold text-indigo-600">Pengaturan</h1>
-
-              <p className="text-slate-500 mt-2">
-                Kelola seluruh konfigurasi IndoTech POS.
-              </p>
-            </header>
-
-            <SettingsMenu
+            <SettingsPage
               settingsTab={settingsTab}
               setSettingsTab={setSettingsTab}
+              setupStoreName={setupStoreName}
+              setSetupStoreName={setSetupStoreName}
+              user={user}
+              role={role}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              handleSaveStore={handleSaveStore}
             />
-
-            {settingsTab === "store" && (
-              <StoreSettings
-                setupStoreName={setupStoreName}
-                setSetupStoreName={setSetupStoreName}
-                user={user}
-                role={role}
-                darkMode={darkMode}
-                setDarkMode={setDarkMode}
-                handleSaveStore={handleSaveStore}
-              />
-            )}
-
-            {settingsTab === "printer" && <PrinterSettings />}
-
-            {settingsTab === "staff" && <StaffSettings />}
-
-            {settingsTab === "security" && <SecuritySettings />}
           </div>
         )}
       </main>

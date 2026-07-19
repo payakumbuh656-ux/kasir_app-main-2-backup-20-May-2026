@@ -31,7 +31,13 @@ ipcMain.handle("system:platform", async () => {
 });
 
 ipcMain.handle("printer:getPrinters", async () => {
-  return await mainWindow.webContents.getPrintersAsync();
+  console.log("IPC printer:getPrinters CALLED");
+  const printers = await mainWindow.webContents.getPrintersAsync();
+
+  console.log("MAIN PROCESS PRINTERS:");
+  console.log(printers);
+
+  return printers;
 });
 
 app.whenReady().then(createWindow);

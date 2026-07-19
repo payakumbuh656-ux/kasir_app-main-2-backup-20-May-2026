@@ -56,11 +56,9 @@ import { db, auth, googleProvider } from "./lib/firebase";
 import { Capacitor } from "@capacitor/core";
 
 import {
-  signInWithPopup,
   onAuthStateChanged,
   signOut,
-  signInWithCredential,
-  GoogleAuthProvider,
+  signInWithCustomToken,
 } from "firebase/auth";
 
 import {
@@ -649,17 +647,10 @@ export default function App() {
     try {
       setIsLoggingIn(true);
 
-      const provider = new GoogleAuthProvider();
-
-      provider.setCustomParameters({
-        prompt: "select_account",
-      });
-
-      await signInWithPopup(auth, provider);
-      showToast("Berhasil login dengan Google!");
+      await window.electron.auth.login();
     } catch (error) {
       console.error(error);
-      showToast("Gagal login Google");
+      showToast("Gagal membuka Google Login");
     } finally {
       setIsLoggingIn(false);
     }

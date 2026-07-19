@@ -22,3 +22,8 @@ coverage/
 
 # Deploy
 .vercel
+
+.env
+.env.local
+service-account.json
+*.pem

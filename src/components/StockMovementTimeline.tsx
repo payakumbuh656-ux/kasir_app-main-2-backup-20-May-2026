@@ -136,9 +136,26 @@ export default function StockMovementTimeline({ movements }: Props) {
     );
   }, [filteredMovements]);
 
+  const groupedSummaryMovements = useMemo(() => {
+    return movements.reduce(
+      (acc, movement) => {
+        const { group } = formatTimelineDate(movement.createdAt);
+
+        if (!acc[group]) {
+          acc[group] = [];
+        }
+
+        acc[group].push(movement);
+
+        return acc;
+      },
+      {} as Record<string, StockMovement[]>,
+    );
+  }, [movements]);
+
   const groupSummaries = useMemo(() => {
     return Object.fromEntries(
-      Object.entries(groupedMovements).map(([group, items]) => {
+      Object.entries(groupedSummaryMovements).map(([group, items]) => {
         const summary = items.reduce(
           (acc, movement) => {
             acc[movement.type] = (acc[movement.type] ?? 0) + 1;
@@ -151,7 +168,7 @@ export default function StockMovementTimeline({ movements }: Props) {
         return [group, summary];
       }),
     );
-  }, [groupedMovements]);
+  }, [groupedSummaryMovements]);
 
   return (
     <div className="border-t border-slate-200">
@@ -181,6 +198,7 @@ export default function StockMovementTimeline({ movements }: Props) {
             { label: "Penjualan", value: "SALE" },
             { label: "Adjustment", value: "ADJUSTMENT" },
             { label: "Pengurangan", value: "REDUCE" },
+            { label: "Edit Barang", value: "EDIT" },
           ].map((item) => (
             <button
               key={item.value}

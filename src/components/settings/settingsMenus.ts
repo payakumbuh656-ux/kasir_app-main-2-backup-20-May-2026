@@ -25,8 +25,8 @@ export const SETTINGS_MENUS: SettingsMenuItem[] = [
   },
   {
     id: "staff",
-    title: "Staff",
-    subtitle: "Kelola Pegawai",
+    title: "Owner dan Staff",
+    subtitle: "Kelola Peran",
     icon: Users,
   },
   {

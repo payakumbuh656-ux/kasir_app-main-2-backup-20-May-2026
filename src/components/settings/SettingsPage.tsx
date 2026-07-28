@@ -23,6 +23,8 @@ interface SettingsPageProps {
   setDarkMode: Dispatch<SetStateAction<boolean>>;
 
   handleSaveStore: () => void;
+
+  showToast: (message: string) => void;
 }
 
 export default function SettingsPage({
@@ -39,6 +41,8 @@ export default function SettingsPage({
   setDarkMode,
 
   handleSaveStore,
+
+  showToast,
 }: SettingsPageProps) {
   return (
     <>
@@ -54,21 +58,19 @@ export default function SettingsPage({
 
       {settingsTab === "store" && (
         <StoreSettings
-          store={{
-            setupStoreName,
-            setSetupStoreName,
-            user,
-            role,
-            darkMode,
-            setDarkMode,
-            handleSaveStore,
-          }}
+          setupStoreName={setupStoreName}
+          setSetupStoreName={setSetupStoreName}
+          user={user}
+          role={role}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          handleSaveStore={handleSaveStore}
         />
       )}
 
       {settingsTab === "printer" && <PrinterSettings />}
 
-      {settingsTab === "staff" && <StaffSettings />}
+      {settingsTab === "staff" && <StaffSettings showToast={showToast} />}
 
       {settingsTab === "security" && <SecuritySettings />}
 

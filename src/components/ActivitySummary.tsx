@@ -1,3 +1,4 @@
+import { Edit2 } from "lucide-react";
 type Props = {
   summary: Record<string, number>;
 
@@ -66,6 +67,51 @@ export default function ActivitySummary({
           </p>
         </button>
       ))}
+      <button
+        type="button"
+        onClick={() => onFilterChange("EDIT")}
+        className={`sm:col-span-2 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-5 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg active:scale-[0.98] ${
+          activeFilter === "EDIT" ? "ring-2 ring-indigo-500 shadow-lg" : ""
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-indigo-100 p-3">
+              <Edit2 size={20} className="text-indigo-600" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-indigo-700">Edit Barang</h3>
+
+              <p className="text-sm text-slate-500">
+                {summary["EDIT"] ?? 0} Aktivitas
+              </p>
+            </div>
+          </div>
+
+          <span className="text-xs font-medium text-slate-400">
+            Klik untuk melihat →
+          </span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-slate-600">
+            Supplier
+          </span>
+
+          <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-slate-600">
+            Modal
+          </span>
+
+          <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-slate-600">
+            Harga
+          </span>
+
+          <span className="rounded-full bg-white/80 px-2 py-1 text-xs text-slate-600">
+            Kategori
+          </span>
+        </div>
+      </button>
     </div>
   );
 }

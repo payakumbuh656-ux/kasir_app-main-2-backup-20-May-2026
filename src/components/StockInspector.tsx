@@ -1,5 +1,5 @@
 import StockMovementTimeline from "./StockMovementTimeline";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Activity,
   BadgeDollarSign,
@@ -51,6 +51,7 @@ type StockMovement = {
   currentStock: number;
   supplier?: string;
   note?: string;
+  changes?: any;
   createdAt?: any;
 };
 
@@ -78,6 +79,48 @@ export default function StockInspector({
   const profit = price - modal;
   const margin = modal > 0 ? (profit / modal) * 100 : 0;
   const [showTimeline, setShowTimeline] = useState(false);
+
+  const PRODUCT_FIELD_LABELS: Record<string, string> = {
+    name: "Nama Barang",
+    barcode: "Barcode",
+    supplier: "Supplier",
+    category: "Kategori",
+    modal: "Harga Modal",
+    price: "Harga Jual",
+  };
+
+  const latestEditMovement = useMemo(() => {
+    const editMovements = movements.filter(
+      (movement) => movement.type === "EDIT",
+    );
+
+    if (editMovements.length === 0) {
+      return undefined;
+    }
+
+    return [...editMovements].sort((a, b) => {
+      const aTime =
+        a.createdAt?.toDate?.().getTime?.() ?? new Date(a.createdAt).getTime();
+
+      const bTime =
+        b.createdAt?.toDate?.().getTime?.() ?? new Date(b.createdAt).getTime();
+
+      return bTime - aTime;
+    })[0];
+  }, [movements]);
+
+  const changedFields = useMemo(() => {
+    if (!latestEditMovement?.changes) {
+      return [];
+    }
+
+    return Object.keys(latestEditMovement.changes);
+  }, [latestEditMovement]);
+
+  const latestEditDate = latestEditMovement?.createdAt?.toDate();
+
+  const getChangedFieldLabel = (field: string) =>
+    PRODUCT_FIELD_LABELS[field] ?? field;
 
   const stockStatus =
     stock === 0
@@ -257,6 +300,40 @@ export default function StockInspector({
           </div>
 
           <div className="flex items-center gap-3">
+            <Clock3 size={18} className="text-slate-400" />
+
+            <div>
+              <p className="text-xs uppercase text-slate-400">
+                Tanggal Input Barang
+              </p>
+
+              <p className="font-semibold text-slate-900">
+                {selectedProduct.createdAt?.toDate
+                  ? selectedProduct.createdAt
+                      .toDate()
+                      .toLocaleDateString("id-ID", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
+                  : "-"}
+              </p>
+
+              <p className="text-sm text-slate-500">
+                {selectedProduct.createdAt?.toDate
+                  ? selectedProduct.createdAt
+                      .toDate()
+                      .toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }) + " WIB"
+                  : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
             <Package size={18} className="text-slate-400" />
 
             <div>
@@ -264,6 +341,69 @@ export default function StockInspector({
 
               <p className="font-semibold text-indigo-600">{stock} pcs</p>
             </div>
+          </div>
+          <div className="border-t border-slate-200 pt-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Clock3 size={18} className="text-indigo-600" />
+
+              <h4 className="font-semibold text-slate-900">
+                Perubahan Terakhir
+              </h4>
+            </div>
+
+            {!latestEditMovement ? (
+              <p className="text-sm text-slate-500">
+                Belum ada riwayat perubahan.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Tanggal Perubahan
+                  </p>
+
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {latestEditDate?.toLocaleDateString("id-ID", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    {latestEditDate?.toLocaleTimeString("id-ID", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    WIB
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Field yang Diubah
+                  </p>
+
+                  {changedFields.length === 0 ? (
+                    <p className="mt-2 text-sm text-slate-500">
+                      Tidak ada detail perubahan.
+                    </p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {changedFields.map((field) => (
+                        <span
+                          key={field}
+                          className="rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 transition-colors"
+                        >
+                          {getChangedFieldLabel(field)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -340,7 +480,6 @@ export default function StockInspector({
           <StockMovementTimeline movements={movements} />
         </div>
       </div>
-      
       {/* ================= QUICK ACTION ================= */}
       <div className="p-6">
         <h3 className="mb-4 font-bold text-slate-900">Quick Actions</h3>

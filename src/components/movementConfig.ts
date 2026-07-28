@@ -28,6 +28,13 @@ export const movementConfig = {
     sign: "±",
   },
 
+  EDIT: {
+    title: "Edit Barang",
+    icon: Activity,
+    color: "blue",
+    sign: "✎",
+  },
+
   SALE: {
     title: "Penjualan POS",
     icon: ShoppingCart,

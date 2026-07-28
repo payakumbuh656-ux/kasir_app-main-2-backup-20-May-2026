@@ -7,15 +7,39 @@ interface StockMovementParams {
 
   productName: string;
 
-  type: "RESTOCK" | "SALE" | "REDUCE" | "ADJUSTMENT";
-
+  type: "RESTOCK" | "SALE" | "REDUCE" | "ADJUSTMENT" | "CREATE" | "EDIT";
   qty: number;
 
   previousStock: number;
   currentStock: number;
 
   supplier?: string;
+
+  invoice?: string;
+
+  reason?: string;
+
   note?: string;
+
+  changes?: {
+    nameBefore?: string;
+    nameAfter?: string;
+
+    barcodeBefore?: string;
+    barcodeAfter?: string;
+
+    supplierBefore?: string;
+    supplierAfter?: string;
+
+    categoryBefore?: string;
+    categoryAfter?: string;
+
+    modalBefore?: number;
+    modalAfter?: number;
+
+    priceBefore?: number;
+    priceAfter?: number;
+  };
 
   createdBy?: string;
 }
@@ -32,7 +56,14 @@ export async function createStockMovement({
   currentStock,
 
   supplier,
+
+  invoice,
+
+  reason,
+
   note,
+
+  changes,
 
   createdBy = "OWNER",
 }: StockMovementParams) {
@@ -50,7 +81,13 @@ export async function createStockMovement({
 
     supplier: supplier ?? "",
 
+    invoice: invoice ?? "",
+
+    reason: reason ?? "",
+
     note: note ?? "",
+
+    changes: changes ?? null,
 
     createdBy,
 

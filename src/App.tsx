@@ -14,19 +14,26 @@ import StoreSettings from "./components/settings/StoreSettings";
 import SettingsMenu from "./components/settings/SettingsMenu";
 import PrinterSettings from "./components/settings/PrinterSettings";
 import StaffSettings from "./components/settings/StaffSettings";
+import { subscribeStaff } from "./modules/staff/service";
+import { verifyOwnerPin, hasOwnerPin, setOwnerPin } from "./modules/owner";
+import { canAccess } from "./modules/staff/permissions";
+import { getCurrentActor } from "./modules/staff/actor";
+import type { Staff } from "./modules/staff/types";
+import {
+  setOperatorSession,
+  setOwnerSession,
+  clearPOSSession,
+  getCurrentStaff,
+  getCurrentMode,
+  resetSessionMemory,
+} from "./modules/staff/session";
 import SecuritySettings from "./components/settings/SecuritySettings";
 import SettingsPage from "./components/settings/SettingsPage";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
+import OperatorGate from "./components/auth/OperatorGate";
+import OwnerPinModal from "./components/auth/OwnerPinModal";
+import OperatorCard from "./components/auth/OperatorCard";
+import type { Product } from "./types/product";
+import { ResponsiveContainer, LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 import {
   ShoppingCart,
@@ -55,11 +62,7 @@ import {
 import { db, auth, googleProvider } from "./lib/firebase";
 import { Capacitor } from "@capacitor/core";
 
-import {
-  onAuthStateChanged,
-  signOut,
-  signInWithCustomToken,
-} from "firebase/auth";
+import { signInWithPopup, onAuthStateChanged, signOut, signInWithCredential, GoogleAuthProvider } from "firebase/auth";
 
 import {
   collection,
@@ -91,22 +94,6 @@ const OperationType = {
   LIST: "LIST",
   DELETE: "DELETE",
 };
-
-interface Product {
-  id: string;
-  barcode: string;
-  name: string;
-  supplier: string;
-  price: number;
-  modal: number;
-
-  stock: number;
-  initialStock: number;
-
-  category: string;
-
-  imageUrl?: string;
-}
 
 interface CartItem extends Product {
   quantity: number;
@@ -147,6 +134,7 @@ const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 export default function App() {
+    console.count("APP RENDER");
   const [user, setUser] = useState<any>(null);
 
   const [storeName, setStoreName] = useState("");
@@ -163,22 +151,23 @@ export default function App() {
   const [setupStoreName, setSetupStoreName] = useState("");
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isOperatorGateOpen, setIsOperatorGateOpen] = useState(true);
+  const [isOwnerPinOpen, setIsOwnerPinOpen] = useState(false);
+  const [ownerPinMode, setOwnerPinMode] = useState<"SETUP" | "VERIFY">("VERIFY");
+  const [showOwnerMode, setShowOwnerMode] = useState(false);
+  const [isEndShiftConfirmOpen, setIsEndShiftConfirmOpen] = useState(false);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [staffLoading, setStaffLoading] = useState(true);
   const [loginData, setLoginData] = useState({
     username: "",
     password: "",
   });
 
-  const [view, setView] = useState<
-    "pos" | "stock" | "history" | "reports" | "dashboard" | "settings" | ""
-  >("pos");
+  const [view, setView] = useState<"pos" | "stock" | "history" | "reports" | "dashboard" | "settings" | "">("pos");
 
-  const [settingsTab, setSettingsTab] = useState<
-    "store" | "printer" | "staff" | "security"
-  >("store");
+  const [settingsTab, setSettingsTab] = useState<"store" | "printer" | "staff" | "security">("store");
 
-  const [currentRole, setCurrentRole] = useState<"state" | "owner" | null>(
-    null,
-  );
+  const [currentRole, setCurrentRole] = useState<"state" | "owner" | null>(null);
 
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(true);
   const [ownerPinInput, setOwnerPinOutput] = useState("");
@@ -189,9 +178,95 @@ export default function App() {
   const [stockMovements, setStockMovements] = useState<any[]>([]);
   const [selectedOutlet, setSelectedOutlet] = useState("Outlet Pusat");
   const [ownerPeriod, setOwnerPeriod] = useState("today");
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("theme") === "dark",
-  );
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      setIsOperatorGateOpen(true);
+      return;
+    }
+
+    const mode = getCurrentMode(currentUser.uid);
+
+    if (mode) {
+      setIsOperatorGateOpen(false);
+    } else {
+      setIsOperatorGateOpen(true);
+    }
+  }, []);
+
+  const [darkMode, setDarkMode] = useState(localStorage.getItem("theme") === "dark");
+
+  function handleEndShift() {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    clearPOSSession(user.uid);
+
+    setShowOwnerMode(true);
+    setIsEndShiftConfirmOpen(false);
+    setIsOperatorGateOpen(true);
+  }
+
+  useEffect(() => {
+    let timer: number | undefined;
+    let isHolding = false;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Shift") return;
+
+      if (e.repeat) return;
+
+      if (isHolding) return;
+
+      isHolding = true;
+
+      if (e.key === "Shift") {
+        if (timer) return;
+
+        timer = window.setTimeout(() => {
+          const currentUser = auth.currentUser;
+
+          if (!currentUser) return;
+
+          const mode = getCurrentMode(currentUser.uid);
+
+          if (mode === "OPERATOR") {
+            if (!isEndShiftConfirmOpen) {
+              setIsEndShiftConfirmOpen(true);
+            }
+          }
+
+          if (mode === "OWNER") {
+            setShowOwnerMode(true);
+
+            setIsOperatorGateOpen(true);
+          }
+        }, 1500);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        if (timer) {
+          clearTimeout(timer);
+          timer = 0;
+        }
+
+        isHolding = false;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
 
   const now = new Date();
 
@@ -201,9 +276,7 @@ export default function App() {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  const cardClass = darkMode
-    ? "bg-slate-900 border border-slate-800"
-    : "bg-white border border-slate-200";
+  const cardClass = darkMode ? "bg-slate-900 border border-slate-800" : "bg-white border border-slate-200";
 
   const textPrimary = darkMode ? "text-white" : "text-slate-900";
 
@@ -237,11 +310,7 @@ export default function App() {
     .reduce((acc, t) => acc + t.total, 0);
 
   const salesGrowth =
-    yesterdaySales > 0
-      ? ((todaySales - yesterdaySales) / yesterdaySales) * 100
-      : todaySales > 0
-        ? 100
-        : 0;
+    yesterdaySales > 0 ? ((todaySales - yesterdaySales) / yesterdaySales) * 100 : todaySales > 0 ? 100 : 0;
 
   const todayTransactions = transactions.filter((t) => {
     const trxDate = new Date(t.date);
@@ -265,8 +334,7 @@ export default function App() {
 
   const transactionGrowth =
     yesterdayTransactions > 0
-      ? ((todayTransactions - yesterdayTransactions) / yesterdayTransactions) *
-        100
+      ? ((todayTransactions - yesterdayTransactions) / yesterdayTransactions) * 100
       : todayTransactions > 0
         ? 100
         : 0;
@@ -276,10 +344,7 @@ export default function App() {
       const trxDate = new Date(t.date);
       const now = new Date();
 
-      return (
-        trxDate.getMonth() === now.getMonth() &&
-        trxDate.getFullYear() === now.getFullYear()
-      );
+      return trxDate.getMonth() === now.getMonth() && trxDate.getFullYear() === now.getFullYear();
     })
     .reduce((acc, t) => acc + t.total, 0);
 
@@ -296,10 +361,7 @@ export default function App() {
     }
 
     if (ownerPeriod === "month") {
-      return (
-        trxDate.getMonth() === now.getMonth() &&
-        trxDate.getFullYear() === now.getFullYear()
-      );
+      return trxDate.getMonth() === now.getMonth() && trxDate.getFullYear() === now.getFullYear();
     }
 
     return trxDate.getFullYear() === now.getFullYear();
@@ -366,17 +428,10 @@ export default function App() {
     }, 0);
 
   const profitGrowth =
-    yesterdayProfit > 0
-      ? ((totalProfit - yesterdayProfit) / yesterdayProfit) * 100
-      : totalProfit > 0
-        ? 100
-        : 0;
+    yesterdayProfit > 0 ? ((totalProfit - yesterdayProfit) / yesterdayProfit) * 100 : totalProfit > 0 ? 100 : 0;
 
   const averageTransaction =
-    totalTransactions > 0
-      ? filteredTransactions.reduce((acc, t) => acc + t.total, 0) /
-        totalTransactions
-      : 0;
+    totalTransactions > 0 ? filteredTransactions.reduce((acc, t) => acc + t.total, 0) / totalTransactions : 0;
 
   const bestSeller = (() => {
     const counts: Record<string, number> = {};
@@ -395,20 +450,22 @@ export default function App() {
   // Firebase Sync
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (u) => {
+      resetSessionMemory();
+
+      setShowOwnerMode(false);
+      setIsOperatorGateOpen(true);
+      setIsEndShiftConfirmOpen(false);
+
       setUser(u);
 
       if (u) {
         setIsLoggedIn(true);
-
-        console.log("USER LOGIN:", u.uid);
 
         const userRef = doc(db, "users", u.uid);
 
         const userSnap = await getDoc(userRef);
 
         if (!userSnap.exists()) {
-          console.log("MEMBUAT USER BARU");
-
           await setDoc(
             userRef,
             {
@@ -419,7 +476,7 @@ export default function App() {
             },
             {
               merge: true,
-            },
+            }
           );
         }
 
@@ -432,11 +489,17 @@ export default function App() {
           setSetupStoreName(data.storeName || "");
           setStoreLogo(data.storeLogo || "");
           setRole(data.role || "owner");
+
+          setShowOwnerMode(data.role === "owner");
         }
 
-        setLoadingStore(false);
+        const unsubscribeStaff = subscribeStaff(u.uid, (staffs) => {
+          setStaffList(staffs);
 
-        console.log("USER DOC BERHASIL DIBACA");
+          setStaffLoading(false);
+        });
+
+        setLoadingStore(false);
       } else {
         setIsLoggedIn(false);
 
@@ -458,13 +521,10 @@ export default function App() {
       if (!window.electron) return;
 
       const result = await window.electron.ping();
-      console.log("Electron IPC:", result);
 
       const platform = await window.electron.system.platform();
-      console.log("Platform:", platform);
 
       const printers = await PrinterService.getPrinters();
-      console.log("Printers:", printers);
     }
 
     testElectron();
@@ -481,24 +541,16 @@ export default function App() {
             ({
               id: doc.id,
               ...doc.data(),
-            }) as Product,
+            }) as Product
         );
 
         setProducts(items);
-
-        console.log(
-          "SNAPSHOT STOCK",
-          items.find((p) => p.id === selectedProductId)?.stock,
-        );
       },
-      (error) => handleFirestoreError(error),
+      (error) => handleFirestoreError(error)
     );
 
     const unsubTransactions = onSnapshot(
-      query(
-        collection(db, "users", user.uid, "transactions"),
-        orderBy("date", "desc"),
-      ),
+      query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")),
       (snapshot) => {
         const items = snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -507,23 +559,20 @@ export default function App() {
 
         setTransactions(items);
       },
-      (error) => handleFirestoreError(error),
+      (error) => handleFirestoreError(error)
     );
 
     const unsubMovements = onSnapshot(
-      query(
-        collection(db, "users", user.uid, "movements"),
-        orderBy("createdAt", "desc"),
-      ),
+      query(collection(db, "users", user.uid, "movements"), orderBy("createdAt", "desc")),
       (snapshot) => {
         setStockMovements(
           snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
-          })),
+          }))
         );
       },
-      (error) => handleFirestoreError(error),
+      (error) => handleFirestoreError(error)
     );
 
     return () => {
@@ -545,12 +594,8 @@ export default function App() {
 
   // States for Stock Management
   const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null,
-  );
-  const selectedProduct =
-    products.find((p) => p.id === selectedProductId) ?? null;
-  console.log("SELECTED PRODUCT STOCK", selectedProduct?.stock);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const selectedProduct = products.find((p) => p.id === selectedProductId) ?? null;
 
   const [isImagePanelOpen, setIsImagePanelOpen] = useState(false);
   const [productImagePreview, setProductImagePreview] = useState("");
@@ -647,10 +692,17 @@ export default function App() {
     try {
       setIsLoggingIn(true);
 
-      await window.electron.auth.login();
+      const provider = new GoogleAuthProvider();
+
+      provider.setCustomParameters({
+        prompt: "select_account",
+      });
+
+      await signInWithPopup(auth, provider);
+      showToast("Berhasil login dengan Google!");
     } catch (error) {
       console.error(error);
-      showToast("Gagal membuka Google Login");
+      showToast("Gagal login Google");
     } finally {
       setIsLoggingIn(false);
     }
@@ -674,14 +726,10 @@ export default function App() {
     }
 
     try {
-      const snapshot = await getDocs(
-        collection(db, "users", user.uid, "transactions"),
-      );
+      const snapshot = await getDocs(collection(db, "users", user.uid, "transactions"));
 
       await Promise.all(
-        snapshot.docs.map((docItem) =>
-          deleteDoc(doc(db, "users", user.uid, "transactions", docItem.id)),
-        ),
+        snapshot.docs.map((docItem) => deleteDoc(doc(db, "users", user.uid, "transactions", docItem.id)))
       );
 
       showToast("Semua riwayat transaksi berhasil dihapus");
@@ -693,8 +741,6 @@ export default function App() {
   };
 
   const showToast = (message: string) => {
-    console.log("SHOW TOAST");
-
     setToast(message);
 
     setTimeout(() => {
@@ -740,8 +786,6 @@ export default function App() {
   const handleSaveStore = async () => {
     if (!user) return;
 
-    console.log("setupStoreName =", setupStoreName);
-
     try {
       await setDoc(
         doc(db, "users", user.uid),
@@ -751,7 +795,7 @@ export default function App() {
         },
         {
           merge: true,
-        },
+        }
       );
 
       setStoreName(setupStoreName);
@@ -765,11 +809,7 @@ export default function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (loginData.username === "admin" && loginData.password === "admin123") {
-      setIsLoggedIn(true);
-    } else {
-      showToast("Username: admin, Password: admin123");
-    }
+    showToast("Silakan masuk menggunakan akun Google.");
   };
 
   const addToCart = (product: Product) => {
@@ -783,9 +823,7 @@ export default function App() {
 
       if (existing) {
         if (existing.quantity >= product.stock) {
-          showToast(
-            `Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`,
-          );
+          showToast(`Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`);
           return prev;
         }
 
@@ -795,7 +833,7 @@ export default function App() {
                 ...item,
                 quantity: item.quantity + 1,
               }
-            : item,
+            : item
         );
       }
 
@@ -822,7 +860,7 @@ export default function App() {
           return { ...item, quantity: newQty };
         }
         return item;
-      }),
+      })
     );
   };
 
@@ -838,26 +876,21 @@ export default function App() {
         const newQty = Math.max(1, Math.min(qty, product.stock));
 
         if (qty > product.stock) {
-          showToast(
-            `Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`,
-          );
+          showToast(`Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`);
         }
 
         return {
           ...item,
           quantity: newQty,
         };
-      }),
+      })
     );
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleCheckout = async () => {
-    const subtotal = cart.reduce(
-      (acc, item) => acc + item.price * item.quantity,
-      0,
-    );
+    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
     if (paidAmount < subtotal) {
       showToast("Uang pelanggan kurang!");
       return;
@@ -886,10 +919,7 @@ export default function App() {
 
     try {
       // Save Transaction to Firestore
-      await setDoc(
-        doc(db, "users", user.uid, "transactions", transactionId),
-        newTransaction,
-      );
+      await setDoc(doc(db, "users", user.uid, "transactions", transactionId), newTransaction);
 
       // Update Stocks in Firestore
       await Promise.all(
@@ -902,13 +932,6 @@ export default function App() {
             await setDoc(doc(db, "users", user.uid, "products", product.id), {
               ...product,
               stock: updatedStock,
-            });
-
-            console.log("SALE MOVEMENT", {
-              productId: product.id,
-              qty: item.quantity,
-              previousStock: product.stock,
-              currentStock: updatedStock,
             });
 
             try {
@@ -925,15 +948,13 @@ export default function App() {
 
                 note: `Penjualan #${transactionId}`,
 
-                createdBy: "KASIR",
+                createdBy: getCurrentActor(),
               });
-
-              console.log("SALE MOVEMENT BERHASIL");
             } catch (err) {
               console.error("SALE MOVEMENT ERROR", err);
             }
           }
-        }),
+        })
       );
 
       setLastTransaction(newTransaction);
@@ -949,33 +970,117 @@ export default function App() {
     }
   };
 
+  const buildProductChanges = (before: Product, after: Product) => {
+    const changes: Record<
+      string,
+      {
+        before: any;
+        after: any;
+      }
+    > = {};
+
+    const fields = ["barcode", "name", "supplier", "price", "modal", "category"] as const;
+
+    fields.forEach((field) => {
+      if (before[field] !== after[field]) {
+        changes[field] = {
+          before: before[field],
+          after: after[field],
+        };
+      }
+    });
+
+    return changes;
+  };
+
   const handleSaveProduct = async () => {
     if (!newProduct.name) {
       showToast("Nama barang harus diisi!");
       return;
     }
     if (!newProduct.barcode) {
-      showToast(
-        "Barcode harus diisi! Jika tidak ada barcode, silakan buat kode unik.",
-      );
+      showToast("Barcode harus diisi! Jika tidak ada barcode, silakan buat kode unik.");
       return;
     }
 
     try {
       const id = editingProduct ? editingProduct.id : Date.now().toString();
 
+      const now = new Date();
+
       const productToSave = {
         ...newProduct,
+
         id,
 
         initialStock: editingProduct
-          ? (newProduct.initialStock ??
-            editingProduct.initialStock ??
-            editingProduct.stock)
+          ? (newProduct.initialStock ?? editingProduct.initialStock ?? editingProduct.stock)
           : newProduct.stock,
+
+        createdAt: editingProduct ? (editingProduct.createdAt ?? now) : now,
+
+        updatedAt: now,
+
+        createdBy: editingProduct ? (editingProduct.createdBy ?? getCurrentActor()) : getCurrentActor(),
+
+        updatedBy: {
+          uid: user.uid,
+          email: user.email,
+          role,
+        },
       };
 
       await setDoc(doc(db, "users", user.uid, "products", id), productToSave);
+
+      if (!editingProduct) {
+        await createStockMovement({
+          userId: user.uid,
+
+          productId: id,
+
+          productName: productToSave.name,
+
+          type: "CREATE",
+
+          qty: productToSave.stock,
+
+          previousStock: 0,
+
+          currentStock: productToSave.stock,
+
+          supplier: productToSave.supplier,
+
+          note: "Input barang baru",
+
+          createdBy: getCurrentActor(),
+        });
+      } else {
+        const changes = buildProductChanges(editingProduct, productToSave);
+
+        if (Object.keys(changes).length > 0) {
+          await createStockMovement({
+            userId: user.uid,
+
+            productId: id,
+
+            productName: productToSave.name,
+
+            type: "EDIT",
+
+            qty: 0,
+
+            previousStock: editingProduct.stock,
+
+            currentStock: productToSave.stock,
+
+            note: "Edit informasi barang",
+
+            changes,
+
+            createdBy: getCurrentActor(),
+          });
+        }
+      }
 
       setIsAddingProduct(false);
       setIsImagePanelOpen(false);
@@ -1004,8 +1109,8 @@ export default function App() {
             message: error?.message,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       showToast("Gagal menyimpan barang ke Cloud.");
@@ -1013,25 +1118,17 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    console.log("DELETE CLICKED");
-
     const product = products.find((p) => p.id === id);
-
-    console.log(product);
 
     setProductToDelete(product);
     setIsDeleteModalOpen(true);
-
-    console.log("MODAL OPEN");
   };
 
   const confirmDeleteProduct = async () => {
     if (!productToDelete) return;
 
     try {
-      await deleteDoc(
-        doc(db, "users", user.uid, "products", productToDelete.id),
-      );
+      await deleteDoc(doc(db, "users", user.uid, "products", productToDelete.id));
 
       showToast(`"${productToDelete.name}" Berhasil Dihapus!`);
 
@@ -1048,13 +1145,10 @@ export default function App() {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl">
-          <h2 className="text-2xl font-bold text-slate-800 mb-3">
-            Hapus Produk?
-          </h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-3">Hapus Produk?</h2>
 
           <p className="text-slate-500 mb-6">
-            Produk yang dihapus akan hilang dari daftar stok dan tidak dapat
-            dipulihkan kembali.
+            Produk yang dihapus akan hilang dari daftar stok dan tidak dapat dipulihkan kembali.
           </p>
 
           <div className="flex justify-end gap-3">
@@ -1111,9 +1205,6 @@ export default function App() {
     );
   }
 
-  console.log("VIEW SEKARANG =", view);
-  console.log("ROLE SEKARANG =", role);
-
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-4">
@@ -1122,12 +1213,8 @@ export default function App() {
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-white mb-4">
               <ShoppingCart size={32} />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              IndoTech Minimarket
-            </h1>
-            <p className="text-slate-500 text-sm">
-              Sistem Kasir Pintar & Terintegrasi
-            </p>
+            <h1 className="text-2xl font-bold text-slate-900">IndoTech Minimarket</h1>
+            <p className="text-slate-500 text-sm">Sistem Kasir Pintar & Terintegrasi</p>
           </div>
           <button
             onClick={() => {
@@ -1138,50 +1225,6 @@ export default function App() {
             <LogIn size={20} className="text-indigo-600" />
             <span>Masuk dengan Google</span>
           </button>
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-100"></div>
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400 bg-white inline-block mx-auto px-4">
-              Atau Gunakan Akun Demo
-            </div>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="admin"
-                value={loginData.username}
-                onChange={(e) =>
-                  setLoginData({ ...loginData, username: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="••••••••"
-                value={loginData.password}
-                onChange={(e) =>
-                  setLoginData({ ...loginData, password: e.target.value })
-                }
-              />
-            </div>
-            <button className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all">
-              Login Ke Sistem
-            </button>
-          </form>
-          <p className="text-center text-xs text-slate-400 font-medium">
-            Demo: admin / admin123
-          </p>
         </div>
       </div>
     );
@@ -1199,9 +1242,7 @@ export default function App() {
             <span className="font-medium text-slate-600">{entry.name}</span>
 
             <span className="font-bold text-slate-900">
-              {entry.name === "Penjualan"
-                ? `Rp ${entry.value.toLocaleString("id-ID")}`
-                : entry.value}
+              {entry.name === "Penjualan" ? `Rp ${entry.value.toLocaleString("id-ID")}` : entry.value}
             </span>
           </div>
         ))}
@@ -1225,8 +1266,6 @@ export default function App() {
 
   const handleInspectorRestock = () => {
     if (!selectedProduct) return;
-
-    console.log("OPEN RESTOCK", selectedProduct);
 
     setRestockQty("");
     setRestockSupplier("");
@@ -1266,36 +1305,12 @@ export default function App() {
     }
 
     try {
-      console.log({
-        stock: selectedProduct.stock,
-        stockType: typeof selectedProduct.stock,
-        qty,
-        qtyType: typeof qty,
-        result: Number(selectedProduct.stock) + Number(qty),
-      });
       const updatedProduct = {
         ...selectedProduct,
         stock: Number(selectedProduct.stock) + qty,
       };
 
-      console.log(
-        "OLD:",
-        selectedProduct.stock,
-        "QTY:",
-        qty,
-        "NEW:",
-        updatedProduct.stock,
-      );
-
-      await setDoc(
-        doc(db, "users", user.uid, "products", selectedProduct.id),
-        updatedProduct,
-      );
-
-      console.log("AFTER SETDOC", {
-        selectedStock: selectedProduct.stock,
-        updatedStock: updatedProduct.stock,
-      });
+      await setDoc(doc(db, "users", user.uid, "products", selectedProduct.id), updatedProduct);
 
       await createStockMovement({
         userId: user.uid,
@@ -1312,7 +1327,7 @@ export default function App() {
         supplier: restockSupplier,
         note: restockNote,
 
-        createdBy: "OWNER",
+        createdBy: getCurrentActor(),
       });
 
       showToast("Restock berhasil.");
@@ -1349,16 +1364,9 @@ export default function App() {
     };
 
     try {
-      await setDoc(
-        doc(db, "users", user.uid, "products", selectedProduct.id),
-        updatedProduct,
-      );
+      await setDoc(doc(db, "users", user.uid, "products", selectedProduct.id), updatedProduct);
 
-      setProducts((prev) =>
-        prev.map((item) =>
-          item.id === updatedProduct.id ? updatedProduct : item,
-        ),
-      );
+      setProducts((prev) => prev.map((item) => (item.id === updatedProduct.id ? updatedProduct : item)));
 
       await createStockMovement({
         userId: user.uid,
@@ -1375,7 +1383,7 @@ export default function App() {
         supplier: reduceReason,
         note: reduceNote,
 
-        createdBy: "OWNER",
+        createdBy: getCurrentActor(),
       });
 
       setIsReduceStockModalOpen(false);
@@ -1411,16 +1419,9 @@ export default function App() {
     };
 
     try {
-      await setDoc(
-        doc(db, "users", user.uid, "products", selectedProduct.id),
-        updatedProduct,
-      );
+      await setDoc(doc(db, "users", user.uid, "products", selectedProduct.id), updatedProduct);
 
-      setProducts((prev) =>
-        prev.map((item) =>
-          item.id === updatedProduct.id ? updatedProduct : item,
-        ),
-      );
+      setProducts((prev) => prev.map((item) => (item.id === updatedProduct.id ? updatedProduct : item)));
 
       await createStockMovement({
         userId: user.uid,
@@ -1434,10 +1435,10 @@ export default function App() {
         previousStock,
         currentStock,
 
-        supplier: adjustmentReason,
+        reason: adjustmentReason,
         note: adjustmentNote,
 
-        createdBy: "OWNER",
+        createdBy: getCurrentActor(),
       });
 
       showToast("Penyesuaian stok berhasil.");
@@ -1455,12 +1456,7 @@ export default function App() {
 
   const supplierSuggestions = [
     ...new Set(
-      products
-        .map((p) => p.supplier)
-        .filter(
-          (supplier): supplier is string =>
-            !!supplier && supplier.trim() !== "",
-        ),
+      products.map((p) => p.supplier).filter((supplier): supplier is string => !!supplier && supplier.trim() !== "")
     ),
   ];
 
@@ -1473,7 +1469,7 @@ export default function App() {
         {
           id: user?.uid ?? "",
           name: user?.displayName ?? "",
-        },
+        }
       )
     : null;
 
@@ -1490,9 +1486,7 @@ export default function App() {
       {/* Sidebar Navigation */}
       <aside
         className={`hidden md:flex w-20 h-screen sticky top-0 border-r flex-col flex-shrink-0 ${
-          darkMode
-            ? "bg-slate-900 border-slate-800"
-            : "bg-white border-slate-200"
+          darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
         }`}
       >
         <div className="flex justify-center pt-6 pb-4">
@@ -1507,9 +1501,7 @@ export default function App() {
           </div>
         </div>
         <div className={"flex flex-col items-center"}>
-          <div
-            className={`w-2 h-2 rounded-full ${user ? "bg-green-500 animate-pulse" : "bg-slate-300"}`}
-          ></div>
+          <div className={`w-2 h-2 rounded-full ${user ? "bg-green-500 animate-pulse" : "bg-slate-300"}`}></div>
 
           <span
             className={`text-[8px] font-bold mt-1 uppercase leading-none ${
@@ -1519,7 +1511,9 @@ export default function App() {
             {user ? "Cloud" : "Offline"}
           </span>
 
-          <div className="text-[10px] text-red-500 mt-1">{role}</div>
+          <div className="text-[10px] text-red-500 mt-1">
+            {getCurrentMode(user?.uid ?? "") === "OPERATOR" ? getCurrentStaff(user?.uid ?? "")?.name : "OWNER"}
+          </div>
           <div className="w-10 h-px bg-slate-200 my-3"></div>
         </div>
         <nav className="flex flex-col items-center space-y-6 flex-1 mt-6">
@@ -1545,10 +1539,9 @@ export default function App() {
             <History size={24} />
           </button>
 
-          {role === "owner" && (
+          {canAccess("dashboard") && (
             <button
               onClick={() => {
-                console.log("dashboard clicked");
                 setView("dashboard");
               }}
               className={`p-3 rounded-xl transition-all ${
@@ -1595,18 +1588,11 @@ export default function App() {
                   <h1 className="text-2xl md:text-3xl xl:text-4xl font-bold text-slate-900">
                     {storeName || "IndoTech POS"}
                   </h1>
-                  <p className="text-xs font-medium text-indigo-600">
-                    Powered by IndoTech
-                  </p>
-                  <p className="text-slate-500 text-sm">
-                    Scan barcode atau ketik nama barang.
-                  </p>
+                  <p className="text-xs font-medium text-indigo-600">Powered by IndoTech</p>
+                  <p className="text-slate-500 text-sm">Scan barcode atau ketik nama barang.</p>
                 </div>
                 <div className="relative w-full md:w-80">
-                  <Barcode
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={18}
-                  />
+                  <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     ref={barcodeRef}
                     autoComplete="off"
@@ -1625,11 +1611,7 @@ export default function App() {
               <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
                 {products
                   .filter(
-                    (p) =>
-                      p.name
-                        .toLowerCase()
-                        .includes(manualSearch.toLowerCase()) ||
-                      p.barcode.includes(manualSearch),
+                    (p) => p.name.toLowerCase().includes(manualSearch.toLowerCase()) || p.barcode.includes(manualSearch)
                   )
                   .map((product) => (
                     <div
@@ -1664,16 +1646,10 @@ export default function App() {
             {/* Right Cart Summary */}
             <aside
               className={`w-full lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l flex flex-col ${
-                darkMode
-                  ? "bg-slate-900 border-slate-800"
-                  : "bg-white border-slate-200"
+                darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
               }`}
             >
-              <div
-                className={`p-6 border-b ${
-                  darkMode ? `border-slate-800` : "border-slate-200"
-                }`}
-              >
+              <div className={`p-6 border-b ${darkMode ? `border-slate-800` : "border-slate-200"}`}>
                 <h2 className="text-xl font-bold flex items-center">
                   Keranjang{" "}
                   <span className="ml-2 bg-indigo-100 text-indigo-600 text-xs px-2 py-1 rounded-full">
@@ -1694,12 +1670,8 @@ export default function App() {
                       className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100"
                     >
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-sm truncate uppercase">
-                          {item.name}
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                          Rp {item.price.toLocaleString("id-ID")}
-                        </p>
+                        <h4 className="font-bold text-sm truncate uppercase">{item.name}</h4>
+                        <p className="text-xs text-slate-400">Rp {item.price.toLocaleString("id-ID")}</p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
@@ -1725,10 +1697,7 @@ export default function App() {
                                 return;
                               }
 
-                              const qty = Math.max(
-                                1,
-                                Math.min(Number(value), item.stock),
-                              );
+                              const qty = Math.max(1, Math.min(Number(value), item.stock));
 
                               setEditingQty(qty.toString());
                             }}
@@ -1775,9 +1744,7 @@ export default function App() {
                         </button>
                       </div>
                       <button
-                        onClick={() =>
-                          setCart((c) => c.filter((x) => x.id !== item.id))
-                        }
+                        onClick={() => setCart((c) => c.filter((x) => x.id !== item.id))}
                         className="text-slate-300 hover:text-red-500"
                       >
                         <Trash2 size={16} />
@@ -1790,10 +1757,7 @@ export default function App() {
                 <div className="flex justify-between text-sm text-slate-400 mb-4 font-bold">
                   <span>TOTAL HARGA</span>
                   <span className="text-white text-2xl font-black">
-                    Rp{" "}
-                    {cart
-                      .reduce((a, b) => a + b.price * b.quantity, 0)
-                      .toLocaleString("id-ID")}
+                    Rp {cart.reduce((a, b) => a + b.price * b.quantity, 0).toLocaleString("id-ID")}
                   </span>
                 </div>
                 <button
@@ -1814,18 +1778,10 @@ export default function App() {
           <div className="p-4 md:p-6 xl:p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
             <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
               <div>
-                <h1
-                  className={`text-2xl font-bold ${
-                    darkMode ? "text-indigo-400" : "text-indigo-600"
-                  }`}
-                >
+                <h1 className={`text-2xl font-bold ${darkMode ? "text-indigo-400" : "text-indigo-600"}`}>
                   Gudang & Stok Barang
                 </h1>
-                <p
-                  className={`text-sm ${
-                    darkMode ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
+                <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
                   Kelola katalog produk minimarket Anda.
                 </p>
               </div>
@@ -1855,19 +1811,13 @@ export default function App() {
 
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
               <div className="bg-white rounded-3xl p-5 border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Total Produk
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase">Total Produk</p>
 
-                <h2 className="text-3xl font-black text-slate-900 mt-2">
-                  {products.length}
-                </h2>
+                <h2 className="text-3xl font-black text-slate-900 mt-2">{products.length}</h2>
               </div>
 
               <div className="bg-white rounded-3xl p-5 border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Total Stok
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase">Total Stok</p>
 
                 <h2 className="text-3xl font-black text-indigo-600 mt-2">
                   {products.reduce((a, b) => a + b.stock, 0)}
@@ -1875,9 +1825,7 @@ export default function App() {
               </div>
 
               <div className="bg-white rounded-3xl p-5 border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Stok Rendah
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase">Stok Rendah</p>
 
                 <h2 className="text-3xl font-black text-red-500 mt-2">
                   {products.filter((p) => p.stock <= 10).length}
@@ -1885,15 +1833,10 @@ export default function App() {
               </div>
 
               <div className="bg-white rounded-3xl p-5 border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Total Modal
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase">Total Modal</p>
 
                 <h2 className="text-xl font-black text-green-600 mt-2">
-                  Rp{" "}
-                  {products
-                    .reduce((a, b) => a + b.modal * b.stock, 0)
-                    .toLocaleString("id-ID")}
+                  Rp {products.reduce((a, b) => a + b.modal * b.stock, 0).toLocaleString("id-ID")}
                 </h2>
               </div>
             </div>
@@ -1915,13 +1858,11 @@ export default function App() {
                 >
                   <option value="Semua">Semua Kategori</option>
 
-                  {[...new Set(products.map((p) => p.category))]
-                    .sort()
-                    .map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
+                  {[...new Set(products.map((p) => p.category))].sort().map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
                 </select>
 
                 <select
@@ -1941,39 +1882,23 @@ export default function App() {
               <div className="flex-1 min-w-0">
                 <div
                   className={`rounded-3xl border ${
-                    darkMode
-                      ? "bg-slate-900 border-slate-800"
-                      : "bg-white border-slate-200 shadow-sm"
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"
                   }`}
                 >
                   <div className="overflow-x-auto overflow-y-visible xl:overflow-x-visible">
                     <table className="w-full xl:min-w-0 min-w-[1100px]">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
-                            Barcode
-                          </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
-                            Nama Barang
-                          </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
-                            Supplier
-                          </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">
-                            Kategori
-                          </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">
-                            Modal
-                          </th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Barcode</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Nama Barang</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Supplier</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Kategori</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">Modal</th>
                           <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-right">
                             Harga Jual
                           </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">
-                            Stok
-                          </th>
-                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">
-                            Aksi
-                          </th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Stok</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
@@ -1986,9 +1911,7 @@ export default function App() {
                               p.barcode.toLowerCase().includes(keyword) ||
                               p.supplier.toLowerCase().includes(keyword);
 
-                            const matchCategory =
-                              stockCategory === "Semua" ||
-                              p.category === stockCategory;
+                            const matchCategory = stockCategory === "Semua" || p.category === stockCategory;
 
                             return matchSearch && matchCategory;
                           })
@@ -2019,8 +1942,7 @@ export default function App() {
                                 setSelectedProductId(p.id);
                               }}
                               style={{
-                                transition:
-                                  "background-color .18s ease, transform .18s ease",
+                                transition: "background-color .18s ease, transform .18s ease",
                               }}
                               className={`cursor-pointer transition-colors duration-200 ${
                                 selectedProductId === p.id
@@ -2033,20 +1955,13 @@ export default function App() {
                               </td>
                               <td className="px-6 py-4 max-w-[340px]">
                                 <div title={p.name} className="space-y-1">
-                                  <p className="font-bold text-slate-900 uppercase leading-5 line-clamp-2">
-                                    {p.name}
-                                  </p>
+                                  <p className="font-bold text-slate-900 uppercase leading-5 line-clamp-2">{p.name}</p>
 
-                                  <p className="text-[11px] uppercase tracking-wide text-slate-400">
-                                    {p.category}
-                                  </p>
+                                  <p className="text-[11px] uppercase tracking-wide text-slate-400">{p.category}</p>
                                 </div>
                               </td>
                               <td className="px-6 py-4 max-w-[220px]">
-                                <p
-                                  title={p.supplier}
-                                  className="truncate text-xs uppercase text-slate-500"
-                                >
+                                <p title={p.supplier} className="truncate text-xs uppercase text-slate-500">
                                   {p.supplier || "-"}
                                 </p>
                               </td>
@@ -2074,11 +1989,7 @@ export default function App() {
                                     onClick={(e) => {
                                       e.stopPropagation();
 
-                                      setSelectedProductId(
-                                        selectedProductId === p.id
-                                          ? null
-                                          : p.id,
-                                      );
+                                      setSelectedProductId(selectedProductId === p.id ? null : p.id);
                                     }}
                                     className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
                                     title="Detail Barang"
@@ -2120,10 +2031,7 @@ export default function App() {
             {/* Modal Tambah/Edit Produk */}
             {selectedProduct && (
               <>
-                <div
-                  className="fixed inset-0 z-40 bg-transparent"
-                  onClick={() => setSelectedProductId(null)}
-                />
+                <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setSelectedProductId(null)} />
 
                 <div
                   key={selectedProduct?.id}
@@ -2137,9 +2045,7 @@ export default function App() {
                     onReduceStock={handleInspectorReduceStock}
                     onAdjustment={handleInspectorAdjustment}
                     onDelete={handleInspectorDelete}
-                    movements={stockMovements.filter(
-                      (m) => m.productId === selectedProduct.id,
-                    )}
+                    movements={stockMovements.filter((m) => m.productId === selectedProduct.id)}
                   />
                 </div>
               </>
@@ -2161,25 +2067,15 @@ export default function App() {
                       <div className="flex items-center gap-5 min-w-0">
                         <div className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-[18px] border border-white/20 bg-white/10 backdrop-blur-xl shadow-lg">
                           {editingProduct ? (
-                            <Edit2
-                              size={32}
-                              strokeWidth={2.2}
-                              className="text-white"
-                            />
+                            <Edit2 size={32} strokeWidth={2.2} className="text-white" />
                           ) : (
-                            <Plus
-                              size={32}
-                              strokeWidth={2.2}
-                              className="text-white"
-                            />
+                            <Plus size={32} strokeWidth={2.2} className="text-white" />
                           )}
                         </div>
 
                         <div className="min-w-0">
                           <h2 className="text-[34px] font-extrabold leading-tight tracking-tight text-white">
-                            {editingProduct
-                              ? "Edit Barang"
-                              : "Input Barang Baru"}
+                            {editingProduct ? "Edit Barang" : "Input Barang Baru"}
                           </h2>
 
                           <p className="mt-1 truncate text-[15px] font-medium text-white/85">
@@ -2204,9 +2100,7 @@ export default function App() {
 
                   <div className="space-y-4 px-6 py-6">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                        Kode Barcode
-                      </label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kode Barcode</label>
                       <div className="flex flex-col md:flex-row gap-2">
                         <input
                           ref={addProductBarcodeRef}
@@ -2242,9 +2136,7 @@ export default function App() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                          Kategori
-                        </label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kategori</label>
                         <select
                           className="w-full px-4 py-3 bg-slate-50 border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
                           value={newProduct.category}
@@ -2264,9 +2156,7 @@ export default function App() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                          Nama Barang
-                        </label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nama Barang</label>
                         <input
                           ref={addProductNameRef}
                           type="text"
@@ -2283,9 +2173,7 @@ export default function App() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                        Supplier
-                      </label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Supplier</label>
                       <input
                         type="text"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
@@ -2307,11 +2195,7 @@ export default function App() {
                         <input
                           type="text"
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-500"
-                          value={
-                            newProduct.modal
-                              ? formatRupiah(newProduct.modal.toString())
-                              : ""
-                          }
+                          value={newProduct.modal ? formatRupiah(newProduct.modal.toString()) : ""}
                           onChange={(e) =>
                             setNewProduct({
                               ...newProduct,
@@ -2321,17 +2205,11 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                          Harga Jual (Rp)
-                        </label>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Harga Jual (Rp)</label>
                         <input
                           type="text"
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
-                          value={
-                            newProduct.price
-                              ? formatRupiah(newProduct.price.toString())
-                              : ""
-                          }
+                          value={newProduct.price ? formatRupiah(newProduct.price.toString()) : ""}
                           onChange={(e) =>
                             setNewProduct({
                               ...newProduct,
@@ -2342,9 +2220,7 @@ export default function App() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                        Stok Awal
-                      </label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Stok Awal</label>
                       <input
                         type="text"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
@@ -2391,10 +2267,7 @@ export default function App() {
             {isImagePanelOpen && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
                 <div className="animate-in zoom-in-95 duration-200">
-                  <ProductImagePanel
-                    imagePreview={productImagePreview}
-                    onSelect={handleSelectProductImage}
-                  />
+                  <ProductImagePanel imagePreview={productImagePreview} onSelect={handleSelectProductImage} />
 
                   <button
                     type="button"
@@ -2458,13 +2331,9 @@ export default function App() {
           <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6 overflow-y-auto flex-1 animate-in slide-in-from-bottom duration-500">
             <header className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                  Riwayat Penjualan
-                </h1>
+                <h1 className="text-2xl font-bold text-slate-900">Riwayat Penjualan</h1>
 
-                <p className="text-slate-500 text-sm">
-                  Semua transaksi yang sudah selesai.
-                </p>
+                <p className="text-slate-500 text-sm">Semua transaksi yang sudah selesai.</p>
               </div>
 
               <button
@@ -2479,40 +2348,30 @@ export default function App() {
               {transactions.map((t) => (
                 <div
                   className={`group p-5 md:p-6 rounded-3xl border transition-all hover:shadow-xl ${
-                    darkMode
-                      ? "bg-slate-900 border-slate-800"
-                      : "bg-white border-slate-200"
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-slate-400">
-                          {t.date}
-                        </span>
+                        <span className="text-xs font-bold text-slate-400">{t.date}</span>
 
                         <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
                           ID: {t.id.slice(-6)}
                         </span>
                       </div>
 
-                      <p className="text-sm font-bold text-slate-900">
-                        {t.items.length} Item
-                      </p>
+                      <p className="text-sm font-bold text-slate-900">{t.items.length} Item</p>
 
                       <p className="text-xs text-slate-500 mt-1">
                         {t.items[0]?.name}
-                        {t.items.length > 1
-                          ? ` +${t.items.length - 1} item lainnya`
-                          : ""}
+                        {t.items.length > 1 ? ` +${t.items.length - 1} item lainnya` : ""}
                       </p>
 
                       <div className="flex gap-2">
                         <span
                           className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                            t.paymentMethod === "QRIS"
-                              ? "bg-green-100 text-green-600"
-                              : "bg-indigo-100 text-indigo-600"
+                            t.paymentMethod === "QRIS" ? "bg-green-100 text-green-600" : "bg-indigo-100 text-indigo-600"
                           }`}
                         >
                           {t.paymentMethod || "Tunai"}
@@ -2525,9 +2384,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end justify-center gap-3 min-w-[180px]">
-                    <p className="text-2xl font-black text-indigo-600">
-                      Rp {t.total.toLocaleString("id-ID")}
-                    </p>
+                    <p className="text-2xl font-black text-indigo-600">Rp {t.total.toLocaleString("id-ID")}</p>
 
                     <span className="text-[11px] bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold">
                       LUNAS
@@ -2569,9 +2426,7 @@ export default function App() {
                 </div>
               ))}
               {transactions.length === 0 && (
-                <div className="py-20 text-center text-slate-400">
-                  Belum ada transaksi hari ini.
-                </div>
+                <div className="py-20 text-center text-slate-400">Belum ada transaksi hari ini.</div>
               )}
             </div>
           </div>
@@ -2597,15 +2452,11 @@ export default function App() {
               </div>
 
               <div>
-                <h1
-                  className={`text-4xl font-black ${darkMode ? "text-white" : "text-indigo-600"}`}
-                >
+                <h1 className={`text-4xl font-black ${darkMode ? "text-white" : "text-indigo-600"}`}>
                   Dashboard Penjualan
                 </h1>
 
-                <p
-                  className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}
-                >
+                <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
                   Pantau performa seluruh outlet secara realtime.
                 </p>
               </div>
@@ -2614,9 +2465,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
               <div
                 className={`rounded-3xl border p-4 transition-all duration-300 hover:shadow-lg ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-5">
@@ -2646,30 +2495,18 @@ export default function App() {
                     <div className="flex items-center gap-2 mt-3">
                       {salesGrowth > 0 ? (
                         <>
-                          <span className="text-green-500 font-bold text-sm">
-                            ▲ {salesGrowth.toFixed(1)}%
-                          </span>
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-green-500 font-bold text-sm">▲ {salesGrowth.toFixed(1)}%</span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : salesGrowth < 0 ? (
                         <>
-                          <span className="text-red-500 font-bold text-sm">
-                            ▼ {Math.abs(salesGrowth).toFixed(1)}%
-                          </span>
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-red-500 font-bold text-sm">▼ {Math.abs(salesGrowth).toFixed(1)}%</span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : (
                         <>
-                          <span className="text-slate-400 font-bold text-sm">
-                            0%
-                          </span>
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 font-bold text-sm">0%</span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       )}
                     </div>
@@ -2678,9 +2515,7 @@ export default function App() {
               </div>
               <div
                 className={`rounded-3xl border p-4 border transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-5">
@@ -2689,24 +2524,16 @@ export default function App() {
                   </div>
 
                   <div className="flex-1">
-                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                      Total Transaksi
-                    </p>
+                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total Transaksi</p>
 
-                    <h2 className="text-[22px] leading-none font-black text-indigo-600 mt-1">
-                      {totalTransactions}
-                    </h2>
+                    <h2 className="text-[22px] leading-none font-black text-indigo-600 mt-1">{totalTransactions}</h2>
 
                     <div className="flex items-center gap-2 mt-3">
                       {transactionGrowth > 0 ? (
                         <>
-                          <span className="text-green-500 font-bold text-sm">
-                            ▲ {transactionGrowth.toFixed(1)}%
-                          </span>
+                          <span className="text-green-500 font-bold text-sm">▲ {transactionGrowth.toFixed(1)}%</span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : transactionGrowth < 0 ? (
                         <>
@@ -2714,19 +2541,13 @@ export default function App() {
                             ▼ {Math.abs(transactionGrowth).toFixed(1)}%
                           </span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : (
                         <>
-                          <span className="text-slate-400 font-bold text-sm">
-                            0%
-                          </span>
+                          <span className="text-slate-400 font-bold text-sm">0%</span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       )}
                     </div>
@@ -2737,9 +2558,7 @@ export default function App() {
               {/* Total Keuntungan */}
               <div
                 className={`rounded-3xl border p-4 transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-5">
@@ -2748,9 +2567,7 @@ export default function App() {
                   </div>
 
                   <div className="flex-1">
-                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                      Total Keuntungan
-                    </p>
+                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total Keuntungan</p>
 
                     <h2 className="text-[22px] leading-none font-black text-green-600 mt-1 whitespace-nowrap">
                       Rp {totalProfit.toLocaleString("id-ID")}
@@ -2759,33 +2576,21 @@ export default function App() {
                     <div className="flex items-center gap-2 mt-3">
                       {profitGrowth > 0 ? (
                         <>
-                          <span className="text-green-500 font-bold text-sm">
-                            ▲ {profitGrowth.toFixed(1)}%
-                          </span>
+                          <span className="text-green-500 font-bold text-sm">▲ {profitGrowth.toFixed(1)}%</span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : profitGrowth < 0 ? (
                         <>
-                          <span className="text-red-500 font-bold text-sm">
-                            ▼ {Math.abs(profitGrowth).toFixed(1)}%
-                          </span>
+                          <span className="text-red-500 font-bold text-sm">▼ {Math.abs(profitGrowth).toFixed(1)}%</span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       ) : (
                         <>
-                          <span className="text-slate-400 font-bold text-sm">
-                            0%
-                          </span>
+                          <span className="text-slate-400 font-bold text-sm">0%</span>
 
-                          <span className="text-slate-400 text-sm">
-                            dari kemarin
-                          </span>
+                          <span className="text-slate-400 text-sm">dari kemarin</span>
                         </>
                       )}
                     </div>
@@ -2795,30 +2600,20 @@ export default function App() {
 
               <div
                 className={`rounded-3xl border p-4 transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
-                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                  Jumlah Produk
-                </p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Jumlah Produk</p>
 
-                <h2 className="text-[36px] font-black text-indigo-600 mt-2">
-                  {products.length}
-                </h2>
+                <h2 className="text-[36px] font-black text-indigo-600 mt-2">{products.length}</h2>
               </div>
 
               <div
                 className={`rounded-3xl border p-4 transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
-                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                  Rata-rata Transaksi
-                </p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Rata-rata Transaksi</p>
 
                 <h2 className="text-[36px] font-black text-indigo-600 mt-2">
                   Rp {averageTransaction.toLocaleString("id-ID")}
@@ -2827,25 +2622,17 @@ export default function App() {
 
               <div
                 className={`rounded-3xl border p-4 transition-all duration-300 ${
-                  darkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-200"
+                  darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}
               >
-                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                  Outlet Aktif
-                </p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Outlet Aktif</p>
 
-                <h2 className="text-[36px] font-black text-green-600 mt-2">
-                  1
-                </h2>
+                <h2 className="text-[36px] font-black text-green-600 mt-2">1</h2>
               </div>
             </div>
 
             <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-indigo-600 mb-4">
-                Grafik Penjualan 7 Hari Terakhir
-              </h2>
+              <h2 className="text-xl font-bold text-indigo-600 mb-4">Grafik Penjualan 7 Hari Terakhir</h2>
 
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -2854,11 +2641,7 @@ export default function App() {
 
                     <XAxis dataKey="day" />
 
-                    <YAxis
-                      tickFormatter={(value) =>
-                        `Rp${(value / 1000000).toFixed(0)}jt`
-                      }
-                    />
+                    <YAxis tickFormatter={(value) => `Rp${(value / 1000000).toFixed(0)}jt`} />
 
                     <Tooltip content={<CustomTooltip />} />
 
@@ -2890,40 +2673,25 @@ export default function App() {
 
             <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-indigo-600 mb-4">
-                  🏆 Top Produk Terlaris
-                </h2>
+                <h2 className="text-xl font-bold text-indigo-600 mb-4">🏆 Top Produk Terlaris</h2>
 
                 <div className="space-y-4">
                   {topProducts.slice(0, 3).map((product, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between items-center border-b border-slate-100 pb-3"
-                    >
+                    <div key={index} className="flex justify-between items-center border-b border-slate-100 pb-3">
                       <div>
-                        <p
-                          className="font-semibold text-slate-800"
-                          title={product.name}
-                        >
-                          #{index + 1}{" "}
-                          {product.name.length > 25
-                            ? product.name.substring(0, 25) + "..."
-                            : product.name}
+                        <p className="font-semibold text-slate-800" title={product.name}>
+                          #{index + 1} {product.name.length > 25 ? product.name.substring(0, 25) + "..." : product.name}
                         </p>
                       </div>
 
-                      <span className="font-bold text-indigo-600">
-                        {product.sold}x
-                      </span>
+                      <span className="font-bold text-indigo-600">{product.sold}x</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-red-600 mb-4">
-                  ⚠ Stok Menipis
-                </h2>
+                <h2 className="text-xl font-bold text-red-600 mb-4">⚠ Stok Menipis</h2>
 
                 <div className="space-y-4">
                   {lowStockProducts.length === 0 ? (
@@ -2934,18 +2702,11 @@ export default function App() {
                         key={product.id}
                         className="flex justify-between items-center border-b border-slate-100 pb-3"
                       >
-                        <span
-                          className="font-semibold text-slate-800"
-                          title={product.name}
-                        >
-                          {product.name.length > 25
-                            ? product.name.substring(0, 25) + "..."
-                            : product.name}
+                        <span className="font-semibold text-slate-800" title={product.name}>
+                          {product.name.length > 25 ? product.name.substring(0, 25) + "..." : product.name}
                         </span>
 
-                        <span className="font-bold text-red-500">
-                          {product.stock}
-                        </span>
+                        <span className="font-bold text-red-500">{product.stock}</span>
                       </div>
                     ))
                   )}
@@ -2967,6 +2728,7 @@ export default function App() {
               darkMode={darkMode}
               setDarkMode={setDarkMode}
               handleSaveStore={handleSaveStore}
+              showToast={showToast}
             />
           </div>
         )}
@@ -2982,11 +2744,7 @@ export default function App() {
       shadow-[0_20px_50px_rgba(0,0,0,0.35)]
       border border-slate-700
       transform transition-all duration-500 ease-out
-      ${
-        isToastVisible
-          ? "translate-y-0 scale-100 opacity-100"
-          : "-translate-y-8 scale-95 opacity-0"
-      }
+      ${isToastVisible ? "translate-y-0 scale-100 opacity-100" : "-translate-y-8 scale-95 opacity-0"}
     `}
         >
           <div className="flex items-center gap-4">
@@ -3008,42 +2766,28 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-3xl p-8 animate-in zoom-in-95 duration-200">
             <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
-              <h2 className="text-xl font-bold flex items-center">
-                Konfirmasi Pembayaran
-              </h2>
-              <button
-                onClick={() => setIsCheckoutModalOpen(false)}
-                className="text-slate-400 hover:text-red-500"
-              >
+              <h2 className="text-xl font-bold flex items-center">Konfirmasi Pembayaran</h2>
+              <button onClick={() => setIsCheckoutModalOpen(false)} className="text-slate-400 hover:text-red-500">
                 <X size={24} />
               </button>
             </header>
 
             <div className="space-y-6">
               <div className="p-4 bg-slate-50 rounded-2xl">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">
-                  Total Tagihan
-                </p>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Tagihan</p>
                 <p className="text-3xl font-black text-indigo-600">
-                  Rp{" "}
-                  {cart
-                    .reduce((a, b) => a + b.price * b.quantity, 0)
-                    .toLocaleString("id-ID")}
+                  Rp {cart.reduce((a, b) => a + b.price * b.quantity, 0).toLocaleString("id-ID")}
                 </p>
               </div>
 
               <div className="mb-4">
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
-                  Metode Pembayaran
-                </label>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Metode Pembayaran</label>
 
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setPaymentMethod("Tunai")}
                     className={`py-3 rounded-xl font-bold transition-all ${
-                      paymentMethod === "Tunai"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-100 text-slate-700"
+                      paymentMethod === "Tunai" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
                     }`}
                   >
                     💵 Tunai
@@ -3052,9 +2796,7 @@ export default function App() {
                   <button
                     onClick={() => setPaymentMethod("QRIS")}
                     className={`py-3 rounded-xl font-bold transition-all ${
-                      paymentMethod === "QRIS"
-                        ? "bg-green-600 text-white"
-                        : "bg-slate-100 text-slate-700"
+                      paymentMethod === "QRIS" ? "bg-green-600 text-white" : "bg-slate-100 text-slate-700"
                     }`}
                   >
                     📱 QRIS
@@ -3064,14 +2806,10 @@ export default function App() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
-                  {paymentMethod === "QRIS"
-                    ? "Nominal QRIS"
-                    : "Uang Pelanggan (Tunai)"}
+                  {paymentMethod === "QRIS" ? "Nominal QRIS" : "Uang Pelanggan (Tunai)"}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">
-                    Rp
-                  </span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">Rp</span>
                   <input
                     type="text"
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500"
@@ -3123,10 +2861,7 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    const totalBelanja = cart.reduce(
-                      (a, b) => a + b.price * b.quantity,
-                      0,
-                    );
+                    const totalBelanja = cart.reduce((a, b) => a + b.price * b.quantity, 0);
 
                     setPaidAmount(totalBelanja);
                   }}
@@ -3137,10 +2872,7 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    const totalBelanja = cart.reduce(
-                      (a, b) => a + b.price * b.quantity,
-                      0,
-                    );
+                    const totalBelanja = cart.reduce((a, b) => a + b.price * b.quantity, 0);
 
                     setPaidAmount(Math.ceil(totalBelanja / 50000) * 50000);
                   }}
@@ -3162,27 +2894,19 @@ export default function App() {
                   <span className="font-bold text-green-700">Kembalian:</span>
                   <span className="text-xl font-black text-green-700">
                     Rp{" "}
-                    {Math.max(
-                      0,
-                      paidAmount -
-                        cart.reduce((a, b) => a + b.price * b.quantity, 0),
-                    ).toLocaleString("id-ID")}
+                    {Math.max(0, paidAmount - cart.reduce((a, b) => a + b.price * b.quantity, 0)).toLocaleString(
+                      "id-ID"
+                    )}
                   </span>
                 </div>
               )}
 
               <button
                 onClick={handleCheckout}
-                disabled={
-                  isProcessing ||
-                  paidAmount <
-                    cart.reduce((a, b) => a + b.price * b.quantity, 0)
-                }
+                disabled={isProcessing || paidAmount < cart.reduce((a, b) => a + b.price * b.quantity, 0)}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-100"
               >
-                <span>
-                  {isProcessing ? "MEMPROSES..." : "PROSES TRANSAKSI"}
-                </span>
+                <span>{isProcessing ? "MEMPROSES..." : "PROSES TRANSAKSI"}</span>
               </button>
             </div>
           </div>
@@ -3192,19 +2916,12 @@ export default function App() {
       {/* Receipt Modal */}
       {isReceiptModalOpen && lastTransaction && (
         <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setIsReceiptModalOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setIsReceiptModalOpen(false)} />
           <div className="absolute right-0 top-0 h-full w-full max-w-[390px] bg-white shadow-2xl flex flex-col">
             <div className="border-b px-6 py-5">
-              <h2 className="text-xl font-black text-indigo-600">
-                Pembayaran Berhasil
-              </h2>
+              <h2 className="text-xl font-black text-indigo-600">Pembayaran Berhasil</h2>
 
-              <p className="text-sm text-slate-500 mt-1">
-                Silakan periksa struk sebelum mencetak.
-              </p>
+              <p className="text-sm text-slate-500 mt-1">Silakan periksa struk sebelum mencetak.</p>
             </div>
 
             <div className="receipt-container flex-1 overflow-y-auto px-6 py-6">
@@ -3234,9 +2951,7 @@ export default function App() {
         <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black text-indigo-600">
-                Detail Transaksi
-              </h2>
+              <h2 className="text-xl font-black text-indigo-600">Detail Transaksi</h2>
 
               <button
                 onClick={() => setIsTransactionDetailOpen(false)}
@@ -3256,17 +2971,13 @@ export default function App() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Jumlah Item</span>
 
-                <span className="font-bold">
-                  {selectedTransaction.items.length}
-                </span>
+                <span className="font-bold">{selectedTransaction.items.length}</span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-slate-500">Produk Pertama</span>
 
-                <span className="font-bold">
-                  {selectedTransaction.items[0]?.name}
-                </span>
+                <span className="font-bold">{selectedTransaction.items[0]?.name}</span>
               </div>
             </div>
 
@@ -3277,31 +2988,101 @@ export default function App() {
             <div className="border-t pt-4 mt-4 space-y-2">
               <div className="flex justify-between">
                 <span>Metode Pembayaran</span>
-                <span className="font-bold">
-                  {selectedTransaction.paymentMethod || "Tunai"}
-                </span>
+                <span className="font-bold">{selectedTransaction.paymentMethod || "Tunai"}</span>
               </div>
 
               <div className="flex justify-between">
                 <span>Dibayar</span>
-                <span className="font-bold">
-                  Rp {selectedTransaction.paidAmount?.toLocaleString("id-ID")}
-                </span>
+                <span className="font-bold">Rp {selectedTransaction.paidAmount?.toLocaleString("id-ID")}</span>
               </div>
 
               <div className="flex justify-between">
                 <span>Kembalian</span>
-                <span className="font-bold">
-                  Rp {selectedTransaction.changeAmount?.toLocaleString("id-ID")}
-                </span>
+                <span className="font-bold">Rp {selectedTransaction.changeAmount?.toLocaleString("id-ID")}</span>
               </div>
 
               <div className="flex justify-between text-lg font-black text-indigo-600 pt-2">
                 <span>Total</span>
-                <span>
-                  Rp {selectedTransaction.total.toLocaleString("id-ID")}
-                </span>
+                <span>Rp {selectedTransaction.total.toLocaleString("id-ID")}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <OperatorGate open={isOperatorGateOpen}>
+        <OperatorCard
+          storeName={storeName}
+          logoUrl={storeLogo}
+          staff={staffList}
+          loading={staffLoading}
+          showOwnerMode={showOwnerMode}
+          onStartShift={(selectedStaff, pin) => {
+            setOperatorSession(user.uid, selectedStaff);
+            setIsOperatorGateOpen(false);
+          }}
+          onOwnerLogin={async () => {
+            const exists = await hasOwnerPin(user.uid);
+
+            if (exists) {
+              setOwnerPinMode("VERIFY");
+            } else {
+              setOwnerPinMode("SETUP");
+            }
+
+            setIsOwnerPinOpen(true);
+          }}
+        />
+      </OperatorGate>
+
+      <OwnerPinModal
+        open={isOwnerPinOpen}
+        mode={ownerPinMode}
+        onClose={() => setIsOwnerPinOpen(false)}
+        onSubmit={async (pin) => {
+          if (ownerPinMode === "SETUP") {
+            await setOwnerPin(user.uid, pin);
+
+            setOwnerSession(user.uid);
+          } else {
+            const valid = await verifyOwnerPin(user.uid, pin);
+
+            if (!valid) {
+              showToast("PIN Owner salah");
+              return;
+            }
+
+            setOwnerSession(user.uid);
+          }
+
+          setIsOwnerPinOpen(false);
+          setIsOperatorGateOpen(false);
+        }}
+      />
+
+      {isEndShiftConfirmOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/10 backdrop-blur-[1px]">
+          <div className="w-full max-w-sm rounded-[28px] border border-slate-100 bg-white p-7 shadow-2xl">
+            <h2 className="text-xl font-black text-slate-900">Akhiri Shift?</h2>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">Anda akan mengakhiri sesi operator saat ini.</p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsEndShiftConfirmOpen(false)}
+                className="h-12 flex-1 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleEndShift}
+                className="h-12 flex-1 rounded-xl bg-violet-600 font-bold text-white hover:bg-violet-700"
+              >
+                Akhiri Shift
+              </button>
             </div>
           </div>
         </div>

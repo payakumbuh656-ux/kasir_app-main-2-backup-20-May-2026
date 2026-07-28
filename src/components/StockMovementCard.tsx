@@ -1,10 +1,17 @@
 import { ArrowDown, ChevronDown, FileText } from "lucide-react";
 import { movementConfig } from "./movementConfig";
-import { forwardRef, useState } from "react";
+import { forwardRef } from "react";
+type FieldChange = {
+  before: unknown;
+  after: unknown;
+};
+
 type StockMovement = {
   id: string;
 
   type: string;
+
+  productName?: string;
 
   qty: number;
 
@@ -15,6 +22,10 @@ type StockMovement = {
   supplier?: string;
 
   note?: string;
+
+  changes?: Record<string, FieldChange>;
+
+  createdBy?: any;
 
   staffName?: string;
 
@@ -63,6 +74,50 @@ function formatCardTime(createdAt: any) {
   };
 }
 
+const rupiahFormatter = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+function getFieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    name: "Nama Barang",
+    barcode: "Barcode",
+    category: "Kategori",
+    supplier: "Supplier",
+    modal: "Modal",
+    hargaJual: "Harga Jual",
+    stock: "Stok",
+    minStock: "Minimum Stok",
+    unit: "Satuan",
+    description: "Deskripsi",
+  };
+
+  return labels[field] ?? field;
+}
+
+function formatChangeValue(field: string, value: unknown) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  const currencyFields = new Set([
+    "modal",
+    "price",
+    "harga",
+    "hargaBeli",
+    "hargaJual",
+  ]);
+
+  if (currencyFields.has(field) && typeof value === "number") {
+    return rupiahFormatter.format(value);
+  }
+
+  return String(value);
+}
+
 export default function StockMovementCard({
   movement,
   highlighted = false,
@@ -107,19 +162,24 @@ export default function StockMovementCard({
       ? "Supplier"
       : movement.type === "SALE"
         ? "Invoice"
-        : "Referensi";
+        : movement.type === "ADJUSTMENT"
+          ? "Alasan Penyesuaian"
+          : "";
 
   const referenceValue =
     movement.type === "RESTOCK"
       ? movement.supplier
       : movement.type === "SALE"
         ? movement.invoice
-        : movement.reason;
+        : movement.type === "ADJUSTMENT"
+          ? movement.reason
+          : "";
 
   const staffName = movement.staffName ?? "-";
   const staffRole = movement.staffRole ?? "Belum diketahui";
-  const [expanded, setExpanded] = useState(false);
   const { short, full } = formatCardTime(movement.createdAt);
+
+  const changeEntries = Object.entries(movement.changes ?? {});
 
   return (
     <div
@@ -141,116 +201,217 @@ export default function StockMovementCard({
               {config.title}
             </h3>
 
-            <p title={full} className="mt-1 text-xs font-medium text-slate-400">
-              {short} WIB
+            <p
+              title={full}
+              className="mt-1 flex flex-col text-xs font-medium text-slate-400"
+            >
+              <span>
+                {new Date(
+                  movement.createdAt?.toDate?.() ?? Date.now(),
+                ).toLocaleDateString("id-ID", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+
+              <span>{short} WIB</span>
             </p>
           </div>
         </div>
 
-        <span
-          className={`rounded-2xl px-4 py-2 text-sm font-black ${color.badge}`}
-        >
-          {config.sign}
-          {movement.qty} pcs
-        </span>
+        {movement.type !== "EDIT" && (
+          <span
+            className={`rounded-2xl px-4 py-2 text-sm font-black ${color.badge}`}
+          >
+            {config.sign}
+            {movement.qty} pcs
+          </span>
+        )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-          <span>{movement.previousStock} pcs</span>
+      {movement.type !== "EDIT" && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-end gap-1">
+              <span className="text-2xl font-black text-slate-700">
+                {movement.previousStock}
+              </span>
 
-          <ArrowDown size={14} className="-rotate-90 text-slate-400" />
+              <span className="mb-1 text-xs font-semibold uppercase text-slate-400">
+                pcs
+              </span>
+            </div>
 
-          <span className="text-indigo-600">{movement.currentStock} pcs</span>
-        </div>
+            <ArrowDown size={18} className="-rotate-90 text-slate-400" />
 
-        <ChevronDown
-          size={18}
-          className={`text-slate-400 transition-transform duration-300 ${
-            expanded ? "rotate-180" : ""
-          }`}
-        />
-      </div>
+            <div className="flex items-end gap-1">
+              <span className="text-2xl font-black text-indigo-600">
+                {movement.currentStock}
+              </span>
 
-      <div className="mt-5 border-t border-slate-100 pt-5">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Staff
-        </p>
-
-        <div className="mt-2">
-          <p className="font-semibold text-slate-800">{staffName}</p>
-
-          <p className="text-sm text-slate-500">{staffRole}</p>
-        </div>
-
-        <div className="mt-5 border-t border-slate-100 pt-5">
-          <div className="flex items-center gap-2">
-            <FileText size={15} className="text-slate-400" />
-
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              {referenceLabel}
-            </p>
+              <span className="mb-1 text-xs font-semibold uppercase text-indigo-400">
+                pcs
+              </span>
+            </div>
           </div>
 
+          <div />
+        </div>
+      )}
+
+      <div
+        className={`${
+          movement.type === "REDUCE"
+            ? "mt-3"
+            : "mt-5 border-t border-slate-100 pt-5"
+        }`}
+      >
+        {movement.type !== "REDUCE" && (
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            {referenceLabel}
+          </p>
+        )}
+
+        {movement.type !== "EDIT" && movement.type !== "REDUCE" && (
           <p className="mt-2 font-semibold text-slate-800">
             {referenceValue || "-"}
           </p>
-        </div>
+        )}
 
-        <div className="mt-5 border-t border-slate-100 pt-5">
-          <div className="flex items-center gap-2">
-            <ArrowDown size={15} className="text-slate-400" />
+        {movement.type !== "EDIT" && (
+          <div
+            className={`border-t border-slate-100 ${
+              movement.type === "REDUCE" ? "mt-0 pt-0" : "mt-5 pt-5"
+            }`}
+          >
+            <div className="mt-2 flex items-center gap-2">
+              <ArrowDown size={15} className="text-slate-400" />
 
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Stock Flow
-            </p>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Sebelumnya
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Stock Flow
               </p>
-
-              <p className="mt-2 text-xl font-black text-slate-700">
-                {movement.previousStock}
-              </p>
-
-              <p className="text-xs text-slate-400">pcs</p>
             </div>
 
-            <ArrowDown
-              size={18}
-              className="shrink-0 -rotate-90 text-slate-400"
-            />
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Sebelumnya
+                </p>
 
-            <div className="flex-1 rounded-2xl border border-indigo-100 bg-indigo-50 p-3 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">
-                Sekarang
-              </p>
+                <p className="mt-2 text-3xl font-black tracking-tight text-slate-700">
+                  {movement.previousStock}
+                </p>
 
-              <p className="mt-2 text-xl font-black text-indigo-600">
-                {movement.currentStock}
-              </p>
+                <p className="text-xs text-slate-400">pcs</p>
+              </div>
 
-              <p className="text-xs text-indigo-400">pcs</p>
-            </div>
-          </div>
-        </div>
+              <ArrowDown
+                size={18}
+                className="shrink-0 -rotate-90 text-slate-400"
+              />
 
-        {movement.note && (
-          <div className="mt-5 border-t border-slate-100 pt-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Catatan
-            </p>
+              <div className="flex-1 rounded-2xl border border-indigo-100 bg-indigo-50 p-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">
+                  Sekarang
+                </p>
 
-            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3">
-              <p className="text-sm leading-6 text-slate-600">
-                {movement.note}
-              </p>
+                <p className="mt-2 text-3xl font-black tracking-tight text-indigo-600">
+                  {movement.currentStock}
+                </p>
+
+                <p className="text-xs text-indigo-400">pcs</p>
+              </div>
             </div>
           </div>
         )}
+
+        {movement.type === "EDIT" && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            {movement.type === "EDIT" ? (
+              <>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Perubahan Data
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  {changeEntries.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      Tidak ada perubahan yang tercatat.
+                    </p>
+                  ) : (
+                    changeEntries.map(([field, change]) => (
+                      <div
+                        key={field}
+                        className="rounded-xl border border-slate-200 bg-white p-3"
+                      >
+                        <p className="text-xs font-bold uppercase text-slate-500">
+                          {getFieldLabel(field)}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span
+                            className="max-w-full break-all rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
+                            title={String(change.before)}
+                          >
+                            {formatChangeValue(field, change.before)}
+                          </span>
+
+                          <ArrowDown
+                            size={14}
+                            className="-rotate-90 shrink-0 text-slate-400"
+                          />
+
+                          <span
+                            className="max-w-full break-all rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-600"
+                            title={String(change.after)}
+                          >
+                            {formatChangeValue(field, change.after)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">
+                Detail aktivitas untuk tipe{" "}
+                <span className="font-semibold">{movement.type}</span> akan
+                ditambahkan pada sprint berikutnya.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Catatan
+          </p>
+
+          {movement.note?.trim() ? (
+            <p className="mt-3 text-[15px] leading-7 text-slate-600 whitespace-pre-wrap">
+              {movement.note}
+            </p>
+          ) : (
+            <p className="mt-3 text-sm italic text-slate-400">
+              Tidak ada catatan.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Staff
+          </p>
+
+          <div className="mt-2">
+            <p className="font-semibold text-slate-800">{staffName}</p>
+
+            <p className="text-sm text-slate-500">{staffRole}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

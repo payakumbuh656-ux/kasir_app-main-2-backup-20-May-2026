@@ -1,34 +1,20 @@
-import type { Staff, StaffPermissions } from "../../../modules/staff/types";
+import type { StaffPermissions } from "../../../modules/staff/types";
 
 interface Props {
-  staff: Staff;
-  onUpdate: (
-    staffId: string,
-    permissions: StaffPermissions
-  ) => Promise<void>;
+  permissions: StaffPermissions;
+
+  onChange: (permissions: StaffPermissions) => void;
 }
 
-export default function StaffPermissionPanel({
-  staff,
-  onUpdate,
-}: Props) {
-
-  async function togglePermission(
-    key: keyof StaffPermissions
-  ) {
-
-    await onUpdate(
-      staff.id,
-      {
-        ...staff.permissions,
-        [key]: !staff.permissions[key],
-      }
-    );
-
+export default function StaffPermissionPanel({ permissions, onChange }: Props) {
+  function togglePermission(key: keyof StaffPermissions) {
+    onChange({
+      ...permissions,
+      [key]: !permissions[key],
+    });
   }
 
-
-  const permissions = [
+  const permissionItems = [
     {
       key: "dashboard",
       label: "Dashboard",
@@ -85,27 +71,19 @@ export default function StaffPermissionPanel({
       description: "Penyesuaian stok",
     },
   ] as {
-    key:keyof StaffPermissions;
-    label:string;
-    description:string;
+    key: keyof StaffPermissions;
+    label: string;
+    description: string;
   }[];
-
 
   return (
     <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+      <h3 className="text-lg font-bold text-slate-800">Hak Akses</h3>
 
-      <h3 className="text-lg font-bold text-slate-800">
-        Hak Akses
-      </h3>
-
-      <p className="mt-1 text-sm text-slate-500">
-        Atur izin yang dapat diakses oleh staff ini.
-      </p>
-
+      <p className="mt-1 text-sm text-slate-500">Atur izin yang dapat diakses oleh staff ini.</p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-
-        {permissions.map((item)=>(
+        {permissionItems.map((item) => (
           <button
             key={item.key}
             onClick={() => togglePermission(item.key)}
@@ -116,36 +94,20 @@ export default function StaffPermissionPanel({
               transition-all hover:border-indigo-300
             "
           >
-
             <div>
-              <p className="font-semibold text-slate-800">
-                {item.label}
-              </p>
+              <p className="font-semibold text-slate-800">{item.label}</p>
 
-              <p className="text-xs text-slate-500">
-                {item.description}
-              </p>
+              <p className="text-xs text-slate-500">{item.description}</p>
             </div>
 
-
             <div
-              className={`
-              h-5 w-5 rounded-md border
-              ${
-                staff.permissions[item.key]
-                ?
-                "bg-indigo-600 border-indigo-600"
-                :
-                "bg-white border-slate-300"
-              }
-              `}
+              className={`h-5 w-5 rounded-md border ${
+                permissions[item.key] ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-300"
+              }`}
             />
-
           </button>
         ))}
-
       </div>
-
     </div>
   );
 }

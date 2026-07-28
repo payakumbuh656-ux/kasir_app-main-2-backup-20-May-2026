@@ -3,16 +3,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electron", {
   ping: () => ipcRenderer.invoke("ping"),
 
-  auth: {
-    login: () => ipcRenderer.invoke("auth:login"),
-
-    onOAuth(callback) {
-      ipcRenderer.on("oauth:url", (_, url) => {
-        callback(url);
-      });
-    },
-  },
-
   system: {
     platform: () => ipcRenderer.invoke("system:platform"),
   },

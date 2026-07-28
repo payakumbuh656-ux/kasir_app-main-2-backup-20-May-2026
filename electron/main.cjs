@@ -1,10 +1,8 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
 
 let mainWindow;
-let authCallbackUrl = null;
-const PROTOCOL = "indotech";
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,12 +29,6 @@ ipcMain.handle("ping", async () => {
 
 ipcMain.handle("system:platform", async () => {
   return process.platform;
-});
-
-ipcMain.handle("auth:login", async () => {
-  await shell.openExternal("https://indotech-oauth.vercel.app/api/auth/google");
-
-  return true;
 });
 
 ipcMain.handle("printer:getPrinters", async () => {
@@ -69,27 +61,8 @@ ipcMain.handle("updater:install", async () => {
   return true;
 });
 
-app.setAsDefaultProtocolClient(PROTOCOL);
-
-app.on("open-url", (event, url) => {
-  event.preventDefault();
-
-  console.log("OAuth Callback:", url);
-
-  authCallbackUrl = url;
-
-  if (mainWindow) {
-    mainWindow.webContents.send("oauth:url", url);
-  }
-});
-
 app.whenReady().then(() => {
   createWindow();
-  mainWindow.webContents.on("did-finish-load", () => {
-    if (authCallbackUrl) {
-      mainWindow.webContents.send("oauth:url", authCallbackUrl);
-    }
-  });
 
   autoUpdater.checkForUpdatesAndNotify();
 });
@@ -109,19 +82,30 @@ autoUpdater.on("checking-for-update", () => {
 autoUpdater.on("update-available", (info) => {
   console.log("Update available:", info.version);
 
-  mainWindow?.webContents.send("updater:update-available", info);
+  mainWindow?.webContents.send(
+    "updater:update-available",
+    info
+  );
 });
 
 autoUpdater.on("update-not-available", (info) => {
   console.log("Already latest version:", info.version);
 
-  mainWindow?.webContents.send("updater:no-update", info);
+  mainWindow?.webContents.send(
+    "updater:no-update",
+    info
+  );
 });
 
 autoUpdater.on("download-progress", (progress) => {
-  console.log(`Downloading ${progress.percent.toFixed(1)}%`);
+  console.log(
+    `Downloading ${progress.percent.toFixed(1)}%`
+  );
 
-  mainWindow?.webContents.send("updater:progress", progress);
+  mainWindow?.webContents.send(
+    "updater:progress",
+    progress
+  );
 });
 
 autoUpdater.on("update-downloaded", (info) => {
@@ -135,5 +119,8 @@ autoUpdater.on("update-downloaded", (info) => {
 autoUpdater.on("error", (err) => {
   console.error("AutoUpdater Error:", err);
 
-  mainWindow?.webContents.send("updater:error", err.message);
+  mainWindow?.webContents.send(
+    "updater:error",
+    err.message
+  );
 });

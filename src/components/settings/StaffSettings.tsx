@@ -23,6 +23,17 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
 
     await updateStaffPermissions(user.uid, staffId, permissions);
 
+    setStaffs((prev) =>
+      prev.map((staff) =>
+        staff.id === staffId
+          ? {
+              ...staff,
+              permissions,
+            }
+          : staff
+      )
+    );
+
     showToast("Permission staff berhasil diperbarui.");
   }
 

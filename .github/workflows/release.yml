@@ -11,16 +11,12 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: false
       matrix:
         os:
           - macos-latest
           - windows-latest
 
     runs-on: ${{ matrix.os }}
-
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
     steps:
       - name: Checkout Repository

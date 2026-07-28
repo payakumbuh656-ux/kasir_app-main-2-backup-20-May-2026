@@ -22,8 +22,4 @@ coverage/
 
 # Deploy
 .vercel
-
-.env
-.env.local
-service-account.json
-*.pem
+kasir_app-main-2-backup-20-May-2026/

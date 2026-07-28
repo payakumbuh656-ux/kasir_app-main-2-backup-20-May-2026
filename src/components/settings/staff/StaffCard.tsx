@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { Staff } from "../../../modules/staff";
-import StaffPermissionPanel from "./StaffPermissionPanel";
+import StaffPermissionPanel from "../../../modules/staff/StaffPermissionPanel";
 
 interface StaffCardProps {
   staff: Staff;
@@ -11,6 +11,13 @@ interface StaffCardProps {
 
 export default function StaffCard({ staff, onUpdatePermissions }: StaffCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  const [draftPermissions, setDraftPermissions] = useState(staff.permissions);
+
+  useEffect(() => {
+    setDraftPermissions(staff.permissions);
+  }, [staff.permissions]);
+  
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
       <div className="flex items-center justify-between">
@@ -31,13 +38,25 @@ export default function StaffCard({ staff, onUpdatePermissions }: StaffCardProps
 
           <span
             className={`rounded-full px-4 py-2 text-xs font-semibold ${
-              staff.active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"
+              staff.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
             }`}
           >
-            {staff.active ? "Aktif" : "Nonaktif"}
+            {staff.active ? "Online" : "Offline"}
           </span>
         </div>
       </div>
+      {expanded && (
+        <div className="mt-5">
+          <StaffPermissionPanel permissions={draftPermissions} onChange={setDraftPermissions} />
+
+          <button
+            onClick={() => onUpdatePermissions(staff.id, draftPermissions)}
+            className="mt-5 w-full rounded-2xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
+          >
+            Simpan Perubahan
+          </button>
+        </div>
+      )}
     </div>
   );
 }

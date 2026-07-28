@@ -1,8 +1,9 @@
 node_modules
+.git
 release
 android
 build
-dist-react
 electron
-.git
+dist-electron
+.gitignore
 .vscode

@@ -1,21 +1,51 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
-  base: './', // 🔥 WAJIB BIAR ELECTRON TIDAK BLANK
+  base: "./",
 
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+
+    VitePWA({
+      registerType: "autoUpdate",
+
+      manifest: {
+        name: "IndoTech POS",
+        short_name: "IndoTech",
+        description: "Sistem Kasir IndoTech POS",
+        theme_color: "#4f46e5",
+        background_color: "#ffffff",
+        display: "standalone",
+
+        icons: [
+          {
+            src: "/icon-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "/icon-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+    }),
+  ],
 
   build: {
-    outDir: 'dist-react',
+    outDir: "dist-react",
     emptyOutDir: true,
   },
 
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 });

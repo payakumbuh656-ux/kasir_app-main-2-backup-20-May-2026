@@ -134,6 +134,7 @@ const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 export default function App() {
+    console.count("APP RENDER");
   const [user, setUser] = useState<any>(null);
 
   const [storeName, setStoreName] = useState("");
@@ -1516,43 +1517,27 @@ export default function App() {
           <div className="w-10 h-px bg-slate-200 my-3"></div>
         </div>
         <nav className="flex flex-col items-center space-y-6 flex-1 mt-6">
-          {canAccess("checkout") && (
-            <button
-              onClick={() => setView("pos")}
-              className={`p-3 rounded-xl transition-all ${view === "pos" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
-              title="Kasir"
-            >
-              <LayoutDashboard size={24} />
-            </button>
-          )}
-
-          {canAccess("inventory") && (
-            <button
-              onClick={() => setView("stock")}
-              className={`p-3 rounded-xl transition-all ${
-                view === "stock"
-                  ? "text-indigo-600 bg-indigo-50"
-                  : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
-              }`}
-              title="Stok Barang"
-            >
-              <Package size={24} />
-            </button>
-          )}
-
-          {canAccess("salesHistory") && (
-            <button
-              onClick={() => setView("history")}
-              className={`p-3 rounded-xl transition-all ${
-                view === "history"
-                  ? "text-indigo-600 bg-indigo-50"
-                  : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
-              }`}
-              title="Riwayat"
-            >
-              <History size={24} />
-            </button>
-          )}
+          <button
+            onClick={() => setView("pos")}
+            className={`p-3 rounded-xl transition-all ${view === "pos" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+            title="Kasir"
+          >
+            <LayoutDashboard size={24} />
+          </button>
+          <button
+            onClick={() => setView("stock")}
+            className={`p-3 rounded-xl transition-all ${view === "stock" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+            title="Stok Barang"
+          >
+            <Package size={24} />
+          </button>
+          <button
+            onClick={() => setView("history")}
+            className={`p-3 rounded-xl transition-all ${view === "history" ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"}`}
+            title="Riwayat"
+          >
+            <History size={24} />
+          </button>
 
           {canAccess("dashboard") && (
             <button
@@ -1570,19 +1555,17 @@ export default function App() {
             </button>
           )}
 
-          {getCurrentMode(user?.uid ?? "") === "OWNER" && (
-            <button
-              onClick={() => setView("settings")}
-              className={`p-3 rounded-xl transition-all ${
-                view === "settings"
-                  ? "text-indigo-600 bg-indigo-50"
-                  : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
-              }`}
-              title="Pengaturan"
-            >
-              <Settings size={24} />
-            </button>
-          )}
+          <button
+            onClick={() => setView("settings")}
+            className={`p-3 rounded-xl transition-all ${
+              view === "settings"
+                ? "text-indigo-600 bg-indigo-50"
+                : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+            }`}
+            title="Pengaturan"
+          >
+            <Settings size={24} />
+          </button>
         </nav>
         <div className="flex justify-center pb-4">
           <button
@@ -1778,7 +1761,7 @@ export default function App() {
                   </span>
                 </div>
                 <button
-                  disabled={cart.length === 0 || !canAccess("checkout")}
+                  disabled={cart.length === 0}
                   onClick={() => setIsCheckoutModalOpen(true)}
                   className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1791,44 +1774,39 @@ export default function App() {
         )}
 
         {/* VIEW: STOCK MANAGEMENT */}
-        {view === "stock" && canAccess("inventory") && (
+        {view === "stock" && (
           <div className="p-4 md:p-6 xl:p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
             <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
               <div>
                 <h1 className={`text-2xl font-bold ${darkMode ? "text-indigo-400" : "text-indigo-600"}`}>
                   Gudang & Stok Barang
                 </h1>
-
                 <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
                   Kelola katalog produk minimarket Anda.
                 </p>
               </div>
-
-              {canAccess("editProduct") && (
-                <button
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setNewProduct({
-                      id: "",
-                      barcode: "",
-                      name: "",
-                      supplier: "",
-                      price: 0,
-                      modal: 0,
-                      stock: 0,
-                      initialStock: 0,
-                      category: "Umum",
-                    });
-
-                    setIsAddingProduct(true);
-                    setIsImagePanelOpen(false);
-                  }}
-                  className="w-full md:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
-                >
-                  <Plus size={20} />
-                  <span>Tambah Barang Baru</span>
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setNewProduct({
+                    id: "",
+                    barcode: "",
+                    name: "",
+                    supplier: "",
+                    price: 0,
+                    modal: 0,
+                    stock: 0,
+                    initialStock: 0,
+                    category: "Umum",
+                  });
+                  setIsAddingProduct(true);
+                  setIsImagePanelOpen(false);
+                }}
+                className="w-full md:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+              >
+                <Plus size={20} />
+                <span>Tambah Barang Baru</span>
+              </button>
             </header>
 
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -2019,31 +1997,26 @@ export default function App() {
                                     <Eye size={18} />
                                   </button>
 
-                                  {canAccess("editProduct") && (
-                                    <button
-                                      onClick={() => {
-                                        setEditingProduct(p);
-                                        setNewProduct(p);
-                                        setIsImagePanelOpen(false);
-                                        setIsAddingProduct(true);
-                                      }}
-                                      className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-                                    >
-                                      <Edit2 size={18} />
-                                    </button>
-                                  )}
-
-                                  {canAccess("deleteProduct") && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteProduct(p.id);
-                                      }}
-                                      className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                    >
-                                      <Trash2 size={18} />
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setEditingProduct(p);
+                                      setNewProduct(p);
+                                      setIsImagePanelOpen(false);
+                                      setIsAddingProduct(true);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                  >
+                                    <Edit2 size={18} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteProduct(p.id);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -2235,8 +2208,7 @@ export default function App() {
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Harga Jual (Rp)</label>
                         <input
                           type="text"
-                          disabled={!canAccess("editPrice")}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
                           value={newProduct.price ? formatRupiah(newProduct.price.toString()) : ""}
                           onChange={(e) =>
                             setNewProduct({
@@ -2355,7 +2327,7 @@ export default function App() {
         />
 
         {/* VIEW: HISTORY TRANSAKSI */}
-        {view === "history" && canAccess("salesHistory") && (
+        {view === "history" && (
           <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6 overflow-y-auto flex-1 animate-in slide-in-from-bottom duration-500">
             <header className="flex items-center justify-between mb-8">
               <div>
@@ -2460,7 +2432,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "dashboard" && canAccess("dashboard") && (
+        {view === "dashboard" && (
           <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
             <header className="mb-8">
               <div className="flex justify-between items-center mb-6">
@@ -2744,7 +2716,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "settings" && getCurrentMode(user?.uid ?? "") === "OWNER" && (
+        {view === "settings" && (
           <div className="p-8 overflow-y-auto flex-1 animate-in fade-in duration-300">
             <SettingsPage
               settingsTab={settingsTab}
@@ -2765,15 +2737,15 @@ export default function App() {
       {toast && (
         <div
           className={`fixed top-8 right-8 z-50
-        bg-slate-900/95 backdrop-blur-md
-        text-white
-        px-10 py-6
-        rounded-3xl
-        shadow-[0_20px_50px_rgba(0,0,0,0.35)]
-        border border-slate-700
-        transform transition-all duration-500 ease-out
-        ${isToastVisible ? "translate-y-0 scale-100 opacity-100" : "-translate-y-8 scale-95 opacity-0"}
-      `}
+      bg-slate-900/95 backdrop-blur-md
+      text-white
+      px-10 py-6
+      rounded-3xl
+      shadow-[0_20px_50px_rgba(0,0,0,0.35)]
+      border border-slate-700
+      transform transition-all duration-500 ease-out
+      ${isToastVisible ? "translate-y-0 scale-100 opacity-100" : "-translate-y-8 scale-95 opacity-0"}
+    `}
         >
           <div className="flex items-center gap-4">
             <div className="text-3xl">✅</div>

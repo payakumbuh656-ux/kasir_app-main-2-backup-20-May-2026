@@ -4,6 +4,7 @@ import { Plus, Users } from "lucide-react";
 
 import { auth } from "../../lib/firebase";
 import { getStaffList, updateStaffPermissions } from "../../modules/staff";
+import { getCurrentMode } from "../../modules/staff/session";
 import type { Staff } from "../../modules/staff";
 import StaffList from "./staff/StaffList";
 import StaffModal from "./staff/StaffModal";
@@ -70,6 +71,12 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
 
     return () => unsub();
   }, []);
+
+  const mode = getCurrentMode(auth.currentUser?.uid ?? "");
+
+  if (mode !== "OWNER") {
+    return <div className="p-6 text-center text-slate-500">Anda tidak memiliki akses ke Staff Management.</div>;
+  }
 
   if (loading) {
     return <div className="p-6">Loading staff...</div>;

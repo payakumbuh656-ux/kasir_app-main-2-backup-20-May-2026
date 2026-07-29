@@ -10,6 +10,7 @@ export interface StaffPermissions {
   deleteProduct: boolean;
   editProduct: boolean;
   editPrice: boolean;
+  salesHistory: boolean;
 }
 
 export interface Staff {
@@ -39,4 +40,5 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
   deleteProduct: false,
   editProduct: false,
   editPrice: false,
+  salesHistory:false,
 };

@@ -2,7 +2,6 @@ import type { StaffPermissions } from "../../../modules/staff/types";
 
 interface Props {
   permissions: StaffPermissions;
-
   onChange: (permissions: StaffPermissions) => void;
 }
 
@@ -59,6 +58,11 @@ export default function StaffPermissionPanel({ permissions, onChange }: Props) {
       key: "void",
       label: "Void",
       description: "Batalkan transaksi",
+    },
+    {
+      key: "salesHistory",
+      label: "Sales History",
+      description: "Melihat riwayat transaksi",
     },
     {
       key: "deleteProduct",

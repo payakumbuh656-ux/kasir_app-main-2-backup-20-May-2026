@@ -7,7 +7,7 @@ interface StockMovementParams {
 
   productName: string;
 
-  type: "RESTOCK" | "SALE" | "REDUCE" | "ADJUSTMENT" | "CREATE" | "EDIT";
+  type: "RESTOCK" | "SALE" | "RETURN" | "REDUCE" | "ADJUSTMENT" | "CREATE" | "EDIT";
   qty: number;
 
   previousStock: number;
@@ -41,7 +41,7 @@ interface StockMovementParams {
     priceAfter?: number;
   };
 
-  createdBy?: string;
+  createdBy?: any;
 }
 
 export async function createStockMovement({
@@ -65,7 +65,7 @@ export async function createStockMovement({
 
   changes,
 
-  createdBy = "OWNER",
+  createdBy = null,
 }: StockMovementParams) {
   await addDoc(collection(db, "users", userId, "movements"), {
     productId,

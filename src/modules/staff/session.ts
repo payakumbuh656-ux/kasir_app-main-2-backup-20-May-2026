@@ -61,8 +61,8 @@ export function getCurrentSession(ownerUid: string) {
 
 // ambil staff aktif
 // kalau OWNER maka hasilnya null
-export function getCurrentStaff(ownerUid: string) {
-  if (!currentSession) {
+export function getCurrentStaff(ownerUid?: string) {
+  if (ownerUid && !currentSession) {
     currentSession = loadSession(ownerUid);
   }
 
@@ -70,8 +70,8 @@ export function getCurrentStaff(ownerUid: string) {
 }
 
 // cek mode sekarang
-export function getCurrentMode(ownerUid: string): POSMode {
-  if (!currentSession) {
+export function getCurrentMode(ownerUid?: string): POSMode {
+  if (ownerUid && !currentSession) {
     currentSession = loadSession(ownerUid);
   }
 

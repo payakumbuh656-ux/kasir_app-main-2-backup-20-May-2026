@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { truncateText } from "./lib/truncateText";
 import useBarcodeScanner from "./core/useBarcodeScanner";
 import { createStockMovement } from "./services/stockMovement";
+import { createReturn } from "./modules/returns/returnService";
 import StockMovementTimeline from "./components/StockMovementTimeline";
 import ProductImagePicker from "./components/ProductImagePicker";
 import ProductEditorModal from "./components/ProductEditorModal";
@@ -44,6 +45,7 @@ import {
   CreditCard,
   Package,
   History,
+  FileText,
   LayoutDashboard,
   LogOut,
   Barcode,
@@ -268,6 +270,41 @@ export default function App() {
   }, []);
 
   const now = new Date();
+
+  const formatTransactionDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+
+    return date.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const formatTransactionTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatInvoiceNumber = (id: string | number) => {
+    const timestamp = Number(id);
+
+    const date = new Date(timestamp);
+
+    const year = date.getFullYear();
+
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+
+    const day = String(date.getDate()).padStart(2, "0");
+
+    const sequence = String(id).slice(-6);
+
+    return `INV-${year}${month}${day}-${sequence}`;
+  };
 
   useEffect(() => {
     localStorage.setItem("theme", darkMode ? "dark" : "light");
@@ -591,6 +628,14 @@ export default function App() {
 
   const [isTransactionDetailOpen, setIsTransactionDetailOpen] = useState(false);
 
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+
+  const [returnItems, setReturnItems] = useState<any[]>([]);
+  const [returnReason, setReturnReason] = useState("");
+  const [isReturning, setIsReturning] = useState(false);
+
+  const returnTotalRefund = returnItems.reduce((acc, item) => acc + item.price * item.returnQty, 0);
+
   // States for Stock Management
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -897,8 +942,11 @@ export default function App() {
 
     setIsProcessing(true);
     const transactionId = Date.now().toString();
+    const actor = getCurrentActor();
+
     const newTransaction = {
       id: transactionId,
+
       items: cart.map((it) => ({
         id: it.id,
         name: it.name,
@@ -907,13 +955,31 @@ export default function App() {
       })),
 
       total: subtotal,
+
+      // Return accounting
+      returnedAmount: 0,
+
+      // Nilai bersih transaksi setelah return
+      netTotal: subtotal,
+
+      // Status transaksi
+      status: "COMPLETED",
+
       paidAmount: paidAmount,
       changeAmount: paidAmount - subtotal,
 
       paymentMethod: paymentMethod,
 
       outletId: "OutletPusat",
+
       date: Date.now(),
+
+      createdBy: {
+        actorId: actor.actorId,
+        actorName: actor.actorName,
+        actorType: actor.actorType,
+        actorRole: actor.actorRole,
+      },
     };
 
     try {
@@ -936,7 +1002,10 @@ export default function App() {
             try {
               await createStockMovement({
                 userId: user.uid,
+
                 productId: product.id,
+
+                productName: product.name,
 
                 type: "SALE",
 
@@ -1342,6 +1411,125 @@ export default function App() {
     }
   };
 
+  const openReturnModal = (transaction: any) => {
+    console.log("RETURN CLICK TRANSACTION:", transaction);
+    console.log("RETURN CLICK ITEMS:", transaction.items);
+    setSelectedTransaction(transaction);
+
+    setReturnItems(
+      transaction.items.map((item: any) => ({
+        ...item,
+        returnQty: 0,
+      }))
+    );
+
+    setReturnReason("");
+
+    setIsReturnModalOpen(true);
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!selectedTransaction || !user) return;
+
+    if (!returnItems.length) {
+      showToast("Pilih barang yang ingin diretur.");
+      return;
+    }
+
+    try {
+      setIsReturning(true);
+
+      for (const item of returnItems) {
+        const productSnap = await getDoc(doc(db, "users", user.uid, "products", item.id));
+
+        if (!productSnap.exists()) {
+          continue;
+        }
+
+        const productData = productSnap.data();
+
+        const previousStock = Number(productData.stock || 0);
+
+        const updatedStock = previousStock + item.returnQty;
+
+        await setDoc(doc(db, "users", user.uid, "products", item.id), {
+          ...productData,
+          stock: updatedStock,
+        });
+
+        await createStockMovement({
+          userId: user.uid,
+
+          productId: item.id,
+
+          productName: item.name,
+
+          type: "RETURN",
+
+          qty: item.returnQty,
+
+          previousStock,
+
+          currentStock: updatedStock,
+
+          note: returnReason,
+
+          createdBy: getCurrentActor(),
+        });
+      }
+
+      const totalRefund = returnItems.reduce((acc, item) => acc + item.price * item.returnQty, 0);
+
+      await createReturn({
+        userId: user.uid,
+
+        transactionId: selectedTransaction.id,
+
+        items: returnItems,
+
+        totalRefund,
+
+        reason: returnReason,
+
+        createdBy: getCurrentActor(),
+      });
+
+      // UPDATE TRANSACTION ACCOUNTING
+
+      const previousReturnedAmount = Number(selectedTransaction.returnedAmount || 0);
+
+      const newReturnedAmount = previousReturnedAmount + totalRefund;
+
+      const newNetTotal = selectedTransaction.total - newReturnedAmount;
+
+      const newStatus = newNetTotal <= 0 ? "RETURNED" : "PARTIAL_RETURN";
+
+      await setDoc(doc(db, "users", user.uid, "transactions", selectedTransaction.id), {
+        ...selectedTransaction,
+
+        returnedAmount: newReturnedAmount,
+
+        netTotal: newNetTotal,
+
+        status: newStatus,
+      });
+
+      showToast("Return berhasil.");
+
+      setIsReturnModalOpen(false);
+
+      setReturnItems([]);
+
+      setReturnReason("");
+    } catch (error) {
+      console.error(error);
+
+      showToast("Return gagal.");
+    } finally {
+      setIsReturning(false);
+    }
+  };
+
   const handleConfirmReduceStock = async () => {
     if (!selectedProduct || !user) return;
 
@@ -1466,8 +1654,8 @@ export default function App() {
           name: storeName,
         },
         {
-          id: user?.uid ?? "",
-          name: user?.displayName ?? "",
+          id: lastTransaction.createdBy?.actorId ?? "",
+          name: lastTransaction.createdBy?.actorName ?? "OWNER",
         }
       )
     : null;
@@ -2375,84 +2563,118 @@ export default function App() {
             <div className="space-y-4">
               {transactions.map((t) => (
                 <div
-                  className={`group p-5 md:p-6 rounded-3xl border transition-all hover:shadow-xl ${
+                  key={t.id}
+                  className={`group rounded-3xl border p-6 transition-all hover:shadow-xl flex items-center justify-between gap-8 ${
                     darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-slate-400">{t.date}</span>
+                  {/* LEFT SIDE */}
 
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
-                          ID: {t.id.slice(-6)}
-                        </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
+                        <FileText size={24} className="text-indigo-600" />
                       </div>
 
-                      <p className="text-sm font-bold text-slate-900">{t.items.length} Item</p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-black text-slate-900">{formatInvoiceNumber(t.id)}</h3>
 
-                      <p className="text-xs text-slate-500 mt-1">
-                        {t.items[0]?.name}
-                        {t.items.length > 1 ? ` +${t.items.length - 1} item lainnya` : ""}
-                      </p>
+                          <span className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold">
+                            {t.items?.length || 0} Item
+                          </span>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                            t.paymentMethod === "QRIS" ? "bg-green-100 text-green-600" : "bg-indigo-100 text-indigo-600"
-                          }`}
-                        >
-                          {t.paymentMethod || "Tunai"}
-                        </span>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                          <span>📅 {formatTransactionDate(t.date)}</span>
 
-                        <span className="text-[10px] text-slate-500 font-bold">
-                          Rp {t.paidAmount?.toLocaleString("id-ID")}
-                        </span>
+                          <span>🕒 {formatTransactionTime(t.date)} WIB</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end justify-center gap-3 min-w-[180px]">
-                    <p className="text-2xl font-black text-indigo-600">Rp {t.total.toLocaleString("id-ID")}</p>
 
-                    <span className="text-[11px] bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold">
-                      LUNAS
+                    <div className="mt-5">
+                      <p className="font-bold text-slate-900 truncate">
+                        {t.items?.[0]?.name || "Produk"}
+
+                        {t.items?.length > 1 ? ` +${t.items.length - 1} item lainnya` : ""}
+                      </p>
+
+                      <p className="text-sm text-slate-500 mt-1">
+                        Qty: {t.items?.reduce((sum: number, item: any) => sum + item.quantity, 0)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          t.paymentMethod === "QRIS" ? "bg-green-100 text-green-600" : "bg-indigo-100 text-indigo-600"
+                        }`}
+                      >
+                        {t.paymentMethod || "Tunai"}
+                      </span>
+
+                      {t.returnedAmount > 0 && (
+                        <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-xs font-bold">
+                          RETURN Rp {t.returnedAmount.toLocaleString("id-ID")}
+                        </span>
+                      )}
+
+                      <span className="text-xs text-slate-500 font-bold">👤 {t.createdBy?.actorName ?? "-"}</span>
+                    </div>
+                  </div>
+
+                  {/* RIGHT SIDE */}
+
+                  <div className="min-w-[280px] border-l border-slate-200/70 pl-8 flex flex-col items-end gap-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        t.paidAmount >= t.total ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                      }`}
+                    >
+                      {t.paidAmount >= t.total ? "LUNAS" : "BELUM LUNAS"}
                     </span>
 
-                    <div className="flex items-center gap-2">
+                    <p className="text-3xl font-black text-indigo-600">
+                      Rp {(t.netTotal ?? t.total)?.toLocaleString("id-ID")}
+                    </p>
+
+                    <div className="flex items-center gap-3">
                       <button
                         onClick={() => {
                           setSelectedTransaction(t);
                           setIsTransactionDetailOpen(true);
                         }}
-                        className="text-xs px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold"
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-bold"
                       >
                         Detail
                       </button>
+
+                      {canAccess("return") && (
+                        <button
+                          onClick={() => {
+                            openReturnModal(t);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 text-sm font-bold"
+                        >
+                          ↩ Retur
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
                           setLastTransaction(t);
                           setIsReceiptModalOpen(true);
                         }}
-                        className="text-xs px-3 py-1 rounded-xl bg-indigo-100 text-indigo-600 hover:bg-indigo-200 font-semibold"
+                        className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-sm font-bold"
                       >
                         Print
                       </button>
                     </div>
-
-                    <button
-                      onClick={() => {
-                        setLastTransaction(t);
-                        setIsReceiptModalOpen(true);
-                      }}
-                      className="ml-4 p-2 text-slate-400 hover:text-indigo-600 transition-all opacity-0 group-hover:opacity-100"
-                      title="Cetak Ulang Struk"
-                    >
-                      <Printer size={16} />
-                    </button>
                   </div>
                 </div>
               ))}
+
               {transactions.length === 0 && (
                 <div className="py-20 text-center text-slate-400">Belum ada transaksi hari ini.</div>
               )}
@@ -2976,10 +3198,15 @@ export default function App() {
       )}
 
       {isTransactionDetailOpen && selectedTransaction && (
-        <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-black text-indigo-600">Detail Transaksi</h2>
+        <div className="fixed inset-0 z-[9999] bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-[560px] overflow-hidden">
+            {/* HEADER */}
+            <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-black text-indigo-600">Detail Transaksi</h2>
+
+                <p className="text-sm text-slate-500 mt-1">{formatInvoiceNumber(selectedTransaction.id)}</p>
+              </div>
 
               <button
                 onClick={() => setIsTransactionDetailOpen(false)}
@@ -2989,50 +3216,397 @@ export default function App() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-slate-500">ID Transaksi</span>
+            {/* BODY */}
+            <div className="p-5 space-y-4">
+              {/* INFO TRANSAKSI */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-400">Waktu</p>
 
-                <span className="font-bold">{selectedTransaction.id}</span>
+                  <p className="font-bold">{formatTransactionDate(selectedTransaction.date)}</p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Kasir</p>
+
+                  <p className="font-bold">{selectedTransaction.createdBy?.actorName || "OWNER"}</p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Pembayaran</p>
+
+                  <p className="font-bold">{selectedTransaction.paymentMethod || "Tunai"}</p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Jumlah Item</p>
+
+                  <p className="font-bold">{selectedTransaction.items?.length || 0} item</p>
+                </div>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-500">Jumlah Item</span>
+              {/* LIST ITEM */}
+              <div>
+                <p className="font-black text-slate-800 mb-3">Daftar Barang</p>
 
-                <span className="font-bold">{selectedTransaction.items.length}</span>
+                <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2">
+                  {selectedTransaction.items?.map((item: any, index: number) => (
+                    <div
+                      key={index}
+                      className="flex justify-between gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 break-words leading-snug">{item.name}</p>
+
+                        <p className="text-sm text-slate-500">
+                          {item.quantity} x Rp {item.price?.toLocaleString("id-ID")}
+                        </p>
+                      </div>
+
+                      <p className="font-black text-indigo-600 whitespace-nowrap ml-4">
+                        Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-500">Produk Pertama</span>
+              {/* SUMMARY */}
+              <div className="border-t border-slate-200 pt-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Dibayar</span>
 
-                <span className="font-bold">{selectedTransaction.items[0]?.name}</span>
+                  <span className="font-bold">Rp {selectedTransaction.paidAmount?.toLocaleString("id-ID")}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Kembalian</span>
+
+                  <span className="font-bold">Rp {selectedTransaction.changeAmount?.toLocaleString("id-ID")}</span>
+                </div>
+
+                <div className="flex justify-between text-lg">
+                  <span className="font-black">Total</span>
+
+                  <span className="font-black text-indigo-600">
+                    Rp {(selectedTransaction.netTotal ?? selectedTransaction.total)?.toLocaleString("id-ID")}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <button className="w-full py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold">
-              Lihat Daftar Barang
-            </button>
+            {/* FOOTER */}
+            <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
+              {canAccess("return") && (
+                <button
+                  onClick={() => {
+                    openReturnModal(selectedTransaction);
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-orange-50 text-orange-600 font-bold hover:bg-orange-100"
+                >
+                  ↩ Retur
+                </button>
+              )}
 
-            <div className="border-t pt-4 mt-4 space-y-2">
-              <div className="flex justify-between">
-                <span>Metode Pembayaran</span>
-                <span className="font-bold">{selectedTransaction.paymentMethod || "Tunai"}</span>
+              <button
+                onClick={() => setIsTransactionDetailOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 font-bold hover:bg-slate-200"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReturnModalOpen && selectedTransaction && (
+        <div className="fixed inset-0 z-[10000] bg-black/30 flex items-center justify-center p-4">
+          <div
+            className="
+      bg-white
+      w-full
+      max-w-[520px]
+      rounded-3xl
+      shadow-xl
+      overflow-hidden
+    "
+          >
+            {/* HEADER */}
+            <div
+              className="
+        px-5
+        py-4
+        border-b
+        border-slate-200
+        flex
+        justify-between
+        items-center
+      "
+            >
+              <div>
+                <h2 className="text-lg font-black text-orange-600">Retur Barang</h2>
+
+                <p className="text-sm text-slate-500 mt-1">{formatInvoiceNumber(selectedTransaction.id)}</p>
               </div>
 
-              <div className="flex justify-between">
-                <span>Dibayar</span>
-                <span className="font-bold">Rp {selectedTransaction.paidAmount?.toLocaleString("id-ID")}</span>
+              <button
+                onClick={() => setIsReturnModalOpen(false)}
+                className="
+            text-slate-400
+            hover:text-red-500
+            text-xl
+          "
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div className="p-5 space-y-4">
+              {/* REASON */}
+
+              <div>
+                <label
+                  className="
+            text-sm
+            font-bold
+            text-slate-700
+          "
+                >
+                  Alasan Retur
+                </label>
+
+                <input
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  placeholder="Contoh: Barang rusak..."
+                  className="
+              mt-2
+              w-full
+              px-4
+              py-3
+              rounded-xl
+              border
+              border-slate-200
+              outline-none
+              focus:border-orange-400
+            "
+                />
               </div>
 
-              <div className="flex justify-between">
-                <span>Kembalian</span>
-                <span className="font-bold">Rp {selectedTransaction.changeAmount?.toLocaleString("id-ID")}</span>
+              {/* ITEM LIST */}
+
+              <div>
+                <div
+                  className="
+            flex
+            justify-between
+            items-center
+            mb-3
+          "
+                >
+                  <p
+                    className="
+              font-black
+              text-slate-800
+            "
+                  >
+                    Daftar Barang
+                  </p>
+
+                  <span
+                    className="
+              text-xs
+              font-bold
+              text-slate-500
+            "
+                  >
+                    {returnItems.length} item
+                  </span>
+                </div>
+
+                <div
+                  className="
+            space-y-3
+            max-h-[260px]
+            overflow-y-auto
+            pr-2
+          "
+                >
+                  {returnItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="
+                  p-3
+                  rounded-2xl
+                  bg-slate-50
+                  border
+                  border-slate-200
+                "
+                    >
+                      <div
+                        className="
+                  flex
+                  justify-between
+                  gap-3
+                "
+                      >
+                        <div className="min-w-0">
+                          <p
+                            className="
+                      font-bold
+                      text-slate-900
+                      truncate
+                      max-w-[260px]
+                    "
+                          >
+                            {item.name}
+                          </p>
+
+                          <p
+                            className="
+                      text-xs
+                      text-slate-500
+                      mt-1
+                    "
+                          >
+                            Dibeli {item.quantity} pcs
+                          </p>
+                        </div>
+
+                        <p
+                          className="
+                    font-black
+                    text-orange-600
+                    whitespace-nowrap
+                  "
+                        >
+                          Rp {(item.price * item.returnQty).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+
+                      <div
+                        className="
+                  flex
+                  items-center
+                  justify-between
+                  mt-3
+                "
+                      >
+                        <span
+                          className="
+                    text-sm
+                    text-slate-500
+                  "
+                        >
+                          Qty Retur
+                        </span>
+
+                        <input
+                          type="number"
+                          value={item.returnQty}
+                          onChange={(e) => {
+                            const qty = Math.min(Number(e.target.value), item.quantity);
+
+                            setReturnItems((prev) =>
+                              prev.map((x, i) =>
+                                i === index
+                                  ? {
+                                      ...x,
+                                      returnQty: qty,
+                                    }
+                                  : x
+                              )
+                            );
+                          }}
+                          className="
+                      w-20
+                      px-3
+                      py-2
+                      rounded-xl
+                      border
+                      text-center
+                      font-bold
+                    "
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-between text-lg font-black text-indigo-600 pt-2">
-                <span>Total</span>
-                <span>Rp {selectedTransaction.total.toLocaleString("id-ID")}</span>
+              {/* TOTAL */}
+
+              <div
+                className="
+          border-t
+          border-slate-200
+          pt-4
+          flex
+          justify-between
+          items-center
+        "
+              >
+                <span className="font-bold text-slate-500">Total Refund</span>
+
+                <span
+                  className="
+            text-xl
+            font-black
+            text-orange-600
+          "
+                >
+                  Rp {returnTotalRefund.toLocaleString("id-ID")}
+                </span>
               </div>
+            </div>
+
+            {/* FOOTER */}
+
+            <div
+              className="
+        px-5
+        py-4
+        border-t
+        border-slate-200
+        flex
+        gap-3
+      "
+            >
+              <button
+                onClick={() => {
+                  setIsReturnModalOpen(false);
+                  setReturnItems([]);
+                  setReturnReason("");
+                }}
+                className="
+            flex-1
+            py-3
+            rounded-xl
+            bg-slate-100
+            font-bold
+            hover:bg-slate-200
+          "
+              >
+                Batal
+              </button>
+
+              <button
+                disabled={isReturning}
+                onClick={handleConfirmReturn}
+                className="
+            flex-1
+            py-3
+            rounded-xl
+            bg-orange-600
+            text-white
+            font-bold
+            hover:bg-orange-700
+            disabled:opacity-50
+          "
+              >
+                {isReturning ? "Memproses..." : "Proses Retur"}
+              </button>
             </div>
           </div>
         </div>

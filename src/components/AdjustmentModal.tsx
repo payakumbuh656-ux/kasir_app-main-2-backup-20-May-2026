@@ -14,6 +14,7 @@ type Props = {
   setNote: React.Dispatch<React.SetStateAction<string>>;
 
   currentStock: number;
+  currentUnit?: string;
   productName: string;
 
   suppliers: string[];
@@ -35,6 +36,7 @@ export default function RestockModal({
   setNote,
 
   currentStock,
+  currentUnit,
   productName,
 
   suppliers,
@@ -52,6 +54,7 @@ export default function RestockModal({
   const physicalStock = qty === "" ? baseStock : Number(qty);
 
   const difference = physicalStock - baseStock;
+  const unit = (currentUnit ?? "PCS").toUpperCase();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-6 md:p-10 overflow-hidden">
       <div className="flex min-h-full items-center justify-center">
@@ -72,10 +75,7 @@ export default function RestockModal({
                     Penyesuaian Stok
                   </h2>
 
-                  <p
-                    className="mt-1 truncate text-[15px] font-medium text-white/85"
-                    title={productName}
-                  >
+                  <p className="mt-1 truncate text-[15px] font-medium text-white/85" title={productName}>
                     {productName}
                   </p>
                 </div>
@@ -84,25 +84,17 @@ export default function RestockModal({
           </div>
           <div className="px-6 pb-4 pt-4 space-y-3">
             <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">
-                STOCK SEKARANG
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">STOCK SEKARANG</p>
 
               <div className="mt-1 flex items-end gap-2">
-                <span className="text-[34px] leading-none font-black text-indigo-600">
-                  {baseStock}
-                </span>
+                <span className="text-[34px] leading-none font-black text-indigo-600">{baseStock}</span>
 
-                <span className="mb-1 text-base font-bold text-indigo-500">
-                  pcs
-                </span>
+                <span className="mb-1 text-base font-bold text-indigo-500">{unit}</span>
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Stok Fisik
-              </label>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Stok Fisik</label>
 
               <input
                 type="text"
@@ -115,9 +107,7 @@ export default function RestockModal({
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Alasan
-              </label>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alasan</label>
 
               <select
                 value={reason}
@@ -134,36 +124,24 @@ export default function RestockModal({
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Catatan
-              </label>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</label>
 
               <textarea
                 rows={2}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder={
-                  reason === "Lainnya"
-                    ? "Alasan penyesuaian..."
-                    : "Catatan (opsional)"
-                }
+                placeholder={reason === "Lainnya" ? "Alasan penyesuaian..." : "Catatan (opsional)"}
                 className="mt-1.5 w-full rounded-2xl border px-4 py-2.5 resize-none"
               />
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Selisih Stok
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Selisih Stok</p>
 
               <div className="mt-2 flex items-end gap-2">
                 <span
                   className={`text-[34px] leading-none font-black ${
-                    difference > 0
-                      ? "text-green-600"
-                      : difference < 0
-                        ? "text-red-600"
-                        : "text-slate-600"
+                    difference > 0 ? "text-green-600" : difference < 0 ? "text-red-600" : "text-slate-600"
                   }`}
                 >
                   {difference > 0 ? "+" : ""}
@@ -172,41 +150,26 @@ export default function RestockModal({
 
                 <span
                   className={`mb-1 text-base font-bold ${
-                    difference > 0
-                      ? "text-green-500"
-                      : difference < 0
-                        ? "text-red-500"
-                        : "text-slate-500"
+                    difference > 0 ? "text-green-500" : difference < 0 ? "text-red-500" : "text-slate-500"
                   }`}
                 >
-                  pcs
+                  {unit}
                 </span>
               </div>
 
               <div className="mt-3 border-t border-slate-200 pt-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Produk
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Produk</p>
 
-                <p
-                  className="mt-1 truncate text-[15px] font-semibold text-slate-700"
-                  title={productName}
-                >
+                <p className="mt-1 truncate text-[15px] font-semibold text-slate-700" title={productName}>
                   📦 {productName}
                 </p>
 
                 <p
                   className={`mt-2 flex items-center gap-2 text-[14px] font-medium ${
-                    difference > 0
-                      ? "text-green-600"
-                      : difference < 0
-                        ? "text-red-600"
-                        : "text-slate-500"
+                    difference > 0 ? "text-green-600" : difference < 0 ? "text-red-600" : "text-slate-500"
                   }`}
                 >
-                  <span>
-                    {difference > 0 ? "⬆" : difference < 0 ? "⬇" : "➖"}
-                  </span>
+                  <span>{difference > 0 ? "⬆" : difference < 0 ? "⬇" : "➖"}</span>
 
                   <span>
                     {difference > 0

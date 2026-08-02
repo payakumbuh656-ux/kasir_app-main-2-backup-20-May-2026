@@ -6,6 +6,8 @@ import { createReturn } from "./modules/returns/returnService";
 import StockMovementTimeline from "./components/StockMovementTimeline";
 import ProductImagePicker from "./components/ProductImagePicker";
 import ProductEditorModal from "./components/ProductEditorModal";
+import CategoryCombobox from "./components/CategoryCombobox";
+import UnitCombobox from "./components/UnitCombobox";
 import ProductImagePanel from "./components/ProductImagePanel";
 import PageContainer from "./components/PageContainer";
 import Receipt from "./modules/receipt/Receipt";
@@ -16,7 +18,11 @@ import SettingsMenu from "./components/settings/SettingsMenu";
 import PrinterSettings from "./components/settings/PrinterSettings";
 import StaffSettings from "./components/settings/StaffSettings";
 import { subscribeStaff } from "./modules/staff/service";
+import { DEFAULT_CATEGORIES } from "./constants/defaultCategories";
+import { DEFAULT_UNITS } from "./constants/defaultUnits";
 import { verifyOwnerPin, hasOwnerPin, setOwnerPin } from "./modules/owner";
+import ProductFormMain from "./components/product/ProductFormMain";
+import ProductFormAdditional from "./components/product/ProductFormAdditional";
 import { canAccess } from "./modules/staff/permissions";
 import { getCurrentActor } from "./modules/staff/actor";
 import type { Staff } from "./modules/staff/types";
@@ -540,6 +546,7 @@ export default function App() {
         setIsLoggedIn(false);
 
         setProducts([]);
+        setCategories([]);
         setTransactions([]);
 
         setStoreName("");
@@ -585,6 +592,54 @@ export default function App() {
       (error) => handleFirestoreError(error)
     );
 
+    const categoriesRef = collection(db, "users", user.uid, "categories");
+
+    const unsubCategories = onSnapshot(
+      categoriesRef,
+      (snapshot) => {
+        const userCategories = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return String(data.name ?? "").trim();
+          })
+          .filter(Boolean);
+
+        const mergedCategories = [
+          ...userCategories,
+          ...DEFAULT_CATEGORIES.filter(
+            (category) => !userCategories.some((userCategory) => userCategory.toLowerCase() === category.toLowerCase())
+          ),
+        ];
+
+        setCategories(mergedCategories);
+      },
+      (error) => handleFirestoreError(error)
+    );
+
+    const unitsRef = collection(db, "users", user.uid, "units");
+
+    const unsubUnits = onSnapshot(
+      unitsRef,
+      (snapshot) => {
+        const userUnits = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return String(data.name ?? "").trim();
+          })
+          .filter(Boolean);
+
+        const mergedUnits = [
+          ...userUnits,
+          ...DEFAULT_UNITS.filter(
+            (unit) => !userUnits.some((userUnit) => userUnit.toLowerCase() === unit.toLowerCase())
+          ),
+        ];
+
+        setUnits(mergedUnits);
+      },
+      (error) => handleFirestoreError(error)
+    );
+
     const unsubTransactions = onSnapshot(
       query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")),
       (snapshot) => {
@@ -613,6 +668,8 @@ export default function App() {
 
     return () => {
       unsubProducts();
+      unsubCategories();
+      unsubUnits();
       unsubTransactions();
       unsubMovements();
     };
@@ -645,6 +702,18 @@ export default function App() {
   const [productImagePreview, setProductImagePreview] = useState("");
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+
+  const [categoryKeyword, setCategoryKeyword] = useState("");
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+  /**
+   * Master Unit
+   * Default bawaan aplikasi + custom milik client.
+   */
+  const [units, setUnits] = useState<string[]>(DEFAULT_UNITS);
+
   const [newProduct, setNewProduct] = useState<Product>({
     id: "",
     barcode: "",
@@ -657,7 +726,12 @@ export default function App() {
     initialStock: 0,
 
     category: "Umum",
+    unit: "PCS",
     imageUrl: "",
+
+    invoiceDate: "",
+    invoiceNumber: "",
+    invoiceNote: "",
   });
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -867,7 +941,9 @@ export default function App() {
 
       if (existing) {
         if (existing.quantity >= product.stock) {
-          showToast(`Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`);
+          showToast(
+            `Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} ${(product.unit ?? "PCS").toUpperCase()}.`
+          );
           return prev;
         }
 
@@ -920,7 +996,9 @@ export default function App() {
         const newQty = Math.max(1, Math.min(qty, product.stock));
 
         if (qty > product.stock) {
-          showToast(`Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} pcs.`);
+          showToast(
+            `Stok "${truncateText(product.name, 28)}" hanya tersedia ${product.stock} ${(product.unit ?? "PCS").toUpperCase()}.`
+          );
         }
 
         return {
@@ -932,6 +1010,7 @@ export default function App() {
   };
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [productPage, setProductPage] = useState<"main" | "additional">("main");
 
   const handleCheckout = async () => {
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -1100,6 +1179,46 @@ export default function App() {
 
       await setDoc(doc(db, "users", user.uid, "products", id), productToSave);
 
+      /**
+       * Simpan kategori milik client.
+       * Tidak mengubah product lama.
+       * Tidak menghapus apa pun.
+       */
+      const categoryName = newProduct.category.trim();
+
+      if (categoryName) {
+        const categoryRef = doc(db, "users", user.uid, "categories", categoryName);
+
+        const categorySnapshot = await getDoc(categoryRef);
+
+        if (!categorySnapshot.exists()) {
+          await setDoc(categoryRef, {
+            name: categoryName,
+            createdAt: new Date(),
+          });
+        }
+      }
+
+      /**
+       * Simpan unit milik client.
+       * Hanya membuat document baru jika belum ada.
+       * Tidak mengubah data produk lama.
+       */
+      const unitName = newProduct.unit?.trim();
+
+      if (unitName) {
+        const unitRef = doc(db, "users", user.uid, "units", unitName);
+
+        const unitSnapshot = await getDoc(unitRef);
+
+        if (!unitSnapshot.exists()) {
+          await setDoc(unitRef, {
+            name: unitName,
+            createdAt: new Date(),
+          });
+        }
+      }
+
       if (!editingProduct) {
         await createStockMovement({
           userId: user.uid,
@@ -1107,6 +1226,8 @@ export default function App() {
           productId: id,
 
           productName: productToSave.name,
+
+          unit: productToSave.unit,
 
           type: "CREATE",
 
@@ -1132,6 +1253,8 @@ export default function App() {
             productId: id,
 
             productName: productToSave.name,
+
+            unit: productToSave.unit,
 
             type: "EDIT",
 
@@ -1164,7 +1287,12 @@ export default function App() {
         stock: 0,
         initialStock: 0,
 
-        category: "Umum",
+        category: "",
+        unit: "PCS",
+
+        invoiceDate: "",
+        invoiceNumber: "",
+        invoiceNote: "",
       });
       showToast("Barang berhasil disimpan!");
     } catch (error: any) {
@@ -1385,6 +1513,8 @@ export default function App() {
         productId: selectedProduct.id,
         productName: selectedProduct.name,
 
+        unit: selectedProduct.unit,
+
         type: "RESTOCK",
 
         qty: qty,
@@ -1560,6 +1690,8 @@ export default function App() {
         productId: selectedProduct.id,
         productName: selectedProduct.name,
 
+        unit: selectedProduct.unit,
+
         type: "REDUCE",
 
         qty,
@@ -1614,6 +1746,8 @@ export default function App() {
         userId: user.uid,
         productId: selectedProduct.id,
         productName: selectedProduct.name,
+
+        unit: selectedProduct.unit,
 
         type: "ADJUSTMENT",
 
@@ -1831,7 +1965,7 @@ export default function App() {
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${product.stock < 10 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}
                         >
-                          {product.stock} pcs
+                          {product.stock} {(product.unit ?? "PCS").toUpperCase()}
                         </span>
                       </div>
                       <h3
@@ -2005,7 +2139,12 @@ export default function App() {
                       modal: 0,
                       stock: 0,
                       initialStock: 0,
-                      category: "Umum",
+                      category: "",
+                      unit: "PCS",
+
+                      invoiceDate: "",
+                      invoiceNumber: "",
+                      invoiceNote: "",
                     });
 
                     setIsAddingProduct(true);
@@ -2190,7 +2329,7 @@ export default function App() {
                                 <span
                                   className={`px-3 py-1 rounded-full text-xs font-bold ${p.stock < 10 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}
                                 >
-                                  {p.stock} pcs
+                                  {p.stock} {(p.unit ?? "PCS").toUpperCase()}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-center">
@@ -2352,23 +2491,23 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kategori</label>
-                        <select
-                          className="w-full px-4 py-3 bg-slate-50 border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+
+                        <CategoryCombobox
                           value={newProduct.category}
-                          onChange={(e) =>
+                          categories={categories}
+                          onChange={(value) =>
                             setNewProduct({
                               ...newProduct,
-                              category: e.target.value,
+                              category: value,
                             })
                           }
-                        >
-                          <option>Minuman</option>
-                          <option>Makanan</option>
-                          <option>Snack</option>
-                          <option>Laptop/Elektronik</option>
-                          <option>Alat Tulis</option>
-                          <option>Lainnya</option>
-                        </select>
+                          onAddCategory={(value) =>
+                            setNewProduct({
+                              ...newProduct,
+                              category: value,
+                            })
+                          }
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nama Barang</label>
@@ -2389,6 +2528,7 @@ export default function App() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Supplier</label>
+
                       <input
                         type="text"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
@@ -2402,6 +2542,7 @@ export default function App() {
                         }
                       />
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
@@ -2437,18 +2578,40 @@ export default function App() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Stok Awal</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={newProduct.initialStock}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            initialStock: parseInt(e.target.value) || 0,
-                            stock: parseInt(e.target.value) || 0,
-                          })
-                        }
-                      />
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                          value={newProduct.initialStock}
+                          onChange={(e) =>
+                            setNewProduct({
+                              ...newProduct,
+                              initialStock: parseInt(e.target.value) || 0,
+                              stock: parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+
+                        <div className="w-36">
+                          <UnitCombobox
+                            value={newProduct.unit ?? "PCS"}
+                            units={units}
+                            onChange={(value) =>
+                              setNewProduct({
+                                ...newProduct,
+                                unit: value,
+                              })
+                            }
+                            onUseUnit={(value) =>
+                              setNewProduct({
+                                ...newProduct,
+                                unit: value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     {productImagePreview && (
@@ -2508,6 +2671,7 @@ export default function App() {
           note={restockNote}
           setNote={setRestockNote}
           currentStock={selectedProduct?.stock ?? 0}
+          currentUnit={selectedProduct?.unit}
           productName={selectedProduct?.name ?? ""}
           suppliers={supplierSuggestions}
           onSave={handleConfirmRestock}
@@ -2522,6 +2686,7 @@ export default function App() {
           note={reduceNote}
           setNote={setReduceNote}
           currentStock={selectedProduct?.stock ?? 0}
+          currentUnit={selectedProduct?.unit}
           productName={selectedProduct?.name ?? ""}
           suppliers={supplierSuggestions}
           onSave={handleConfirmReduceStock}
@@ -2537,6 +2702,7 @@ export default function App() {
           note={adjustmentNote}
           setNote={setAdjustmentNote}
           currentStock={selectedProduct?.stock ?? 0}
+          currentUnit={selectedProduct?.unit}
           productName={selectedProduct?.name ?? ""}
           suppliers={supplierSuggestions}
           onSave={handleConfirmAdjustment}

@@ -15,6 +15,8 @@ type StockMovement = {
 
   qty: number;
 
+  unit?: string;
+
   previousStock: number;
 
   currentStock: number;
@@ -180,6 +182,7 @@ export default function StockMovementCard({
   const { short, full } = formatCardTime(movement.createdAt);
 
   const changeEntries = Object.entries(movement.changes ?? {});
+  const unit = (movement.unit ?? "PCS").toUpperCase();
 
   return (
     <div
@@ -226,7 +229,7 @@ export default function StockMovementCard({
             className={`rounded-2xl px-4 py-2 text-sm font-black ${color.badge}`}
           >
             {config.sign}
-            {movement.qty} pcs
+            {movement.qty} {unit}
           </span>
         )}
       </div>
@@ -240,7 +243,7 @@ export default function StockMovementCard({
               </span>
 
               <span className="mb-1 text-xs font-semibold uppercase text-slate-400">
-                pcs
+                {unit}
               </span>
             </div>
 
@@ -252,7 +255,7 @@ export default function StockMovementCard({
               </span>
 
               <span className="mb-1 text-xs font-semibold uppercase text-indigo-400">
-                pcs
+                {unit}
               </span>
             </div>
           </div>
@@ -304,7 +307,7 @@ export default function StockMovementCard({
                   {movement.previousStock}
                 </p>
 
-                <p className="text-xs text-slate-400">pcs</p>
+                <p className="text-xs text-slate-400">{unit}</p>
               </div>
 
               <ArrowDown
@@ -321,7 +324,7 @@ export default function StockMovementCard({
                   {movement.currentStock}
                 </p>
 
-                <p className="text-xs text-indigo-400">pcs</p>
+                <p className="text-xs text-indigo-400">{unit}</p>
               </div>
             </div>
           </div>

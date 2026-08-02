@@ -14,6 +14,7 @@ import {
   Trash2,
   TrendingUp,
   Wallet,
+  FileText,
   X,
 } from "lucide-react";
 
@@ -23,9 +24,17 @@ type Product = {
   name?: string;
   supplier?: string;
   category?: string;
+
+  unit?: string;
+
   modal?: number;
   price?: number;
   stock?: number;
+
+  invoiceDate?: string;
+  invoiceNumber?: string;
+  invoiceNote?: string;
+
   createdAt?: any;
   updatedAt?: any;
 };
@@ -75,6 +84,8 @@ export default function StockInspector({
   const price = selectedProduct.price ?? 0;
   const stock = selectedProduct.stock ?? 0;
 
+  const unit = selectedProduct.unit ?? "PCS";
+
   const inventoryValue = modal * stock;
   const profit = price - modal;
   const margin = modal > 0 ? (profit / modal) * 100 : 0;
@@ -90,20 +101,16 @@ export default function StockInspector({
   };
 
   const latestEditMovement = useMemo(() => {
-    const editMovements = movements.filter(
-      (movement) => movement.type === "EDIT",
-    );
+    const editMovements = movements.filter((movement) => movement.type === "EDIT");
 
     if (editMovements.length === 0) {
       return undefined;
     }
 
     return [...editMovements].sort((a, b) => {
-      const aTime =
-        a.createdAt?.toDate?.().getTime?.() ?? new Date(a.createdAt).getTime();
+      const aTime = a.createdAt?.toDate?.().getTime?.() ?? new Date(a.createdAt).getTime();
 
-      const bTime =
-        b.createdAt?.toDate?.().getTime?.() ?? new Date(b.createdAt).getTime();
+      const bTime = b.createdAt?.toDate?.().getTime?.() ?? new Date(b.createdAt).getTime();
 
       return bTime - aTime;
     })[0];
@@ -119,8 +126,7 @@ export default function StockInspector({
 
   const latestEditDate = latestEditMovement?.createdAt?.toDate();
 
-  const getChangedFieldLabel = (field: string) =>
-    PRODUCT_FIELD_LABELS[field] ?? field;
+  const getChangedFieldLabel = (field: string) => PRODUCT_FIELD_LABELS[field] ?? field;
 
   const stockStatus =
     stock === 0
@@ -129,8 +135,7 @@ export default function StockInspector({
           badge: "bg-red-100 text-red-700",
           bar: "bg-red-500",
           width: "5%",
-          message:
-            "Produk sedang habis! Segera lakukan restock agar penjualan tidak terganggu.",
+          message: "Produk sedang habis! Segera lakukan restock agar penjualan tidak terganggu.",
         }
       : stock < 10
         ? {
@@ -138,8 +143,7 @@ export default function StockInspector({
             badge: "bg-amber-100 text-amber-700",
             bar: "bg-amber-500",
             width: "35%",
-            message:
-              "Stok mulai menipis! Segera melakukan pembelian ulang agar stok tetap aman!",
+            message: "Stok mulai menipis! Segera melakukan pembelian ulang agar stok tetap aman!",
           }
         : {
             label: "Stok Aman",
@@ -162,53 +166,34 @@ export default function StockInspector({
             <div className="flex items-center gap-2 text-indigo-600">
               <Package size={18} />
 
-              <span className="text-xs font-bold uppercase tracking-[0.25em]">
-                Detail Barang
-              </span>
+              <span className="text-xs font-bold uppercase tracking-[0.25em]">Detail Barang</span>
             </div>
 
-            <h2 className="mt-4 text-2xl font-black text-slate-900">
-              {selectedProduct.name}
-            </h2>
+            <h2 className="mt-4 text-2xl font-black text-slate-900">{selectedProduct.name}</h2>
 
-            <p className="mt-1 font-mono text-sm text-slate-500">
-              {selectedProduct.barcode || "-"}
-            </p>
+            <p className="mt-1 font-mono text-sm text-slate-500">{selectedProduct.barcode || "-"}</p>
           </div>
 
-          <button
-            onClick={onClose}
-            className="rounded-xl p-2 transition hover:bg-slate-100"
-          >
+          <button onClick={onClose} className="rounded-xl p-2 transition hover:bg-slate-100">
             <X size={18} />
           </button>
         </div>
 
         <div className="mt-6 flex items-center justify-between">
-          <span
-            className={`rounded-full px-4 py-1 text-xs font-bold ${stockStatus.badge}`}
-          >
-            {stockStatus.label}
-          </span>
+          <span className={`rounded-full px-4 py-1 text-xs font-bold ${stockStatus.badge}`}>{stockStatus.label}</span>
 
           <span className="text-sm font-semibold text-slate-500">
-            {stock} pcs
+            {stock} {unit}
           </span>
         </div>
       </div>
       {/* ================= HERO ================= */}
       <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-blue-700 p-6 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-100">
-          Nilai Inventaris
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-100">Nilai Inventaris</p>
 
-        <h1 className="mt-3 text-4xl font-black">
-          Rp {inventoryValue.toLocaleString("id-ID")}
-        </h1>
+        <h1 className="mt-3 text-4xl font-black">Rp {inventoryValue.toLocaleString("id-ID")}</h1>
 
-        <p className="mt-2 text-sm text-indigo-100">
-          Total inventory asset based on current stock.
-        </p>
+        <p className="mt-2 text-sm text-indigo-100">Total inventory asset based on current stock.</p>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
@@ -218,9 +203,7 @@ export default function StockInspector({
               <span className="text-xs uppercase">Harga Modal</span>
             </div>
 
-            <h3 className="mt-3 text-lg font-bold">
-              Rp {modal.toLocaleString("id-ID")}
-            </h3>
+            <h3 className="mt-3 text-lg font-bold">Rp {modal.toLocaleString("id-ID")}</h3>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
@@ -230,9 +213,7 @@ export default function StockInspector({
               <span className="text-xs uppercase">Harga Jual</span>
             </div>
 
-            <h3 className="mt-3 text-lg font-bold">
-              Rp {price.toLocaleString("id-ID")}
-            </h3>
+            <h3 className="mt-3 text-lg font-bold">Rp {price.toLocaleString("id-ID")}</h3>
           </div>
         </div>
       </div>
@@ -246,23 +227,15 @@ export default function StockInspector({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Keuntungan/pcs
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Keuntungan/{unit}</p>
 
-            <h3 className="mt-2 text-xl font-black text-emerald-600">
-              Rp {profit.toLocaleString("id-ID")}
-            </h3>
+            <h3 className="mt-2 text-xl font-black text-emerald-600">Rp {profit.toLocaleString("id-ID")}</h3>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Margin
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Margin</p>
 
-            <h3 className="mt-2 text-xl font-black text-indigo-600">
-              {margin.toFixed(1)}%
-            </h3>
+            <h3 className="mt-2 text-xl font-black text-indigo-600">{margin.toFixed(1)}%</h3>
           </div>
         </div>
       </div>
@@ -281,9 +254,7 @@ export default function StockInspector({
             <div>
               <p className="text-xs uppercase text-slate-400">Supplier</p>
 
-              <p className="font-semibold text-slate-900">
-                {selectedProduct.supplier || "-"}
-              </p>
+              <p className="font-semibold text-slate-900">{selectedProduct.supplier || "-"}</p>
             </div>
           </div>
 
@@ -293,9 +264,7 @@ export default function StockInspector({
             <div>
               <p className="text-xs uppercase text-slate-400">Category</p>
 
-              <p className="font-semibold text-slate-900">
-                {selectedProduct.category || "-"}
-              </p>
+              <p className="font-semibold text-slate-900">{selectedProduct.category || "-"}</p>
             </div>
           </div>
 
@@ -303,33 +272,61 @@ export default function StockInspector({
             <Clock3 size={18} className="text-slate-400" />
 
             <div>
-              <p className="text-xs uppercase text-slate-400">
-                Tanggal Input Barang
-              </p>
+              <p className="text-xs uppercase text-slate-400">Tanggal Input Barang</p>
 
               <p className="font-semibold text-slate-900">
                 {selectedProduct.createdAt?.toDate
-                  ? selectedProduct.createdAt
-                      .toDate()
-                      .toLocaleDateString("id-ID", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })
+                  ? selectedProduct.createdAt.toDate().toLocaleDateString("id-ID", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })
                   : "-"}
               </p>
 
               <p className="text-sm text-slate-500">
                 {selectedProduct.createdAt?.toDate
-                  ? selectedProduct.createdAt
-                      .toDate()
-                      .toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }) + " WIB"
+                  ? selectedProduct.createdAt.toDate().toLocaleTimeString("id-ID", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }) + " WIB"
                   : ""}
               </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <FileText size={18} className="mt-1 text-slate-400" />
+
+            <div className="flex-1">
+              <p className="text-xs uppercase text-slate-400">Informasi Tambahan</p>
+
+              {selectedProduct.invoiceDate || selectedProduct.invoiceNumber || selectedProduct.invoiceNote ? (
+                <div className="mt-2 space-y-3">
+                  <div>
+                    <p className="text-[11px] uppercase text-slate-400">Tanggal Faktur</p>
+
+                    <p className="font-semibold text-slate-900">{selectedProduct.invoiceDate || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase text-slate-400">Nomor Faktur</p>
+
+                    <p className="font-semibold text-slate-900">{selectedProduct.invoiceNumber || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase text-slate-400">Catatan Faktur</p>
+
+                    <p className="font-semibold text-slate-900 whitespace-pre-wrap">
+                      {selectedProduct.invoiceNote || "-"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-400 italic">Belum ada informasi tambahan.</p>
+              )}
             </div>
           </div>
 
@@ -339,28 +336,24 @@ export default function StockInspector({
             <div>
               <p className="text-xs uppercase text-slate-400">Stok saat Ini</p>
 
-              <p className="font-semibold text-indigo-600">{stock} pcs</p>
+              <p className="font-semibold text-indigo-600">
+                {stock} {unit}
+              </p>
             </div>
           </div>
           <div className="border-t border-slate-200 pt-5">
             <div className="mb-4 flex items-center gap-2">
               <Clock3 size={18} className="text-indigo-600" />
 
-              <h4 className="font-semibold text-slate-900">
-                Perubahan Terakhir
-              </h4>
+              <h4 className="font-semibold text-slate-900">Perubahan Terakhir</h4>
             </div>
 
             {!latestEditMovement ? (
-              <p className="text-sm text-slate-500">
-                Belum ada riwayat perubahan.
-              </p>
+              <p className="text-sm text-slate-500">Belum ada riwayat perubahan.</p>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Tanggal Perubahan
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Tanggal Perubahan</p>
 
                   <p className="mt-1 font-semibold text-slate-900">
                     {latestEditDate?.toLocaleDateString("id-ID", {
@@ -381,14 +374,10 @@ export default function StockInspector({
                 </div>
 
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Field yang Diubah
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Field yang Diubah</p>
 
                   {changedFields.length === 0 ? (
-                    <p className="mt-2 text-sm text-slate-500">
-                      Tidak ada detail perubahan.
-                    </p>
+                    <p className="mt-2 text-sm text-slate-500">Tidak ada detail perubahan.</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {changedFields.map((field) => (
@@ -417,15 +406,9 @@ export default function StockInspector({
 
         <div className="rounded-2xl bg-slate-50 p-5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-500">
-              Kondisi Stok
-            </span>
+            <span className="text-sm font-medium text-slate-500">Kondisi Stok</span>
 
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-bold ${stockStatus.badge}`}
-            >
-              {stockStatus.label}
-            </span>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${stockStatus.badge}`}>{stockStatus.label}</span>
           </div>
 
           <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-200">
@@ -437,9 +420,7 @@ export default function StockInspector({
             />
           </div>
 
-          <p className="mt-4 text-sm leading-6 text-slate-500">
-            {stockStatus.message}
-          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-500">{stockStatus.message}</p>
         </div>
       </div>
       {/* ================= STOCK MOVEMENT ================= */}
@@ -452,15 +433,11 @@ export default function StockInspector({
           <div>
             <div className="flex items-center gap-2">
               <Clock3 size={18} className="text-indigo-600" />
-              <h3 className="font-bold text-slate-900">
-                Riwayat Pergerakan Stok
-              </h3>
+              <h3 className="font-bold text-slate-900">Riwayat Pergerakan Stok</h3>
             </div>
 
             <p className="mt-1 text-sm text-slate-500">
-              {movements.length === 0
-                ? "Belum ada aktivitas"
-                : `${movements.length} aktivitas tercatat`}
+              {movements.length === 0 ? "Belum ada aktivitas" : `${movements.length} aktivitas tercatat`}
             </p>
           </div>
 

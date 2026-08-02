@@ -14,6 +14,7 @@ type Props = {
   setNote: React.Dispatch<React.SetStateAction<string>>;
 
   currentStock: number;
+  currentUnit?: string;
   productName: string;
 
   suppliers: string[];
@@ -35,6 +36,7 @@ export default function RestockModal({
   setNote,
 
   currentStock,
+  currentUnit,
   productName,
 
   suppliers,
@@ -54,6 +56,7 @@ export default function RestockModal({
   const previewStock = Math.max(0, baseStock - Number(qty || 0));
 
   const hasInput = qty.trim() !== "";
+  const unit = (currentUnit ?? "PCS").toUpperCase();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-6 md:p-10">
@@ -70,14 +73,9 @@ export default function RestockModal({
               </div>
 
               <div className="min-w-0">
-                <h2 className="text-[34px] font-extrabold leading-tight tracking-tight text-white">
-                  Kurangi Stok
-                </h2>
+                <h2 className="text-[34px] font-extrabold leading-tight tracking-tight text-white">Kurangi Stok</h2>
 
-                <p
-                  className="mt-1 truncate text-[15px] font-medium text-white/85"
-                  title={productName}
-                >
+                <p className="mt-1 truncate text-[15px] font-medium text-white/85" title={productName}>
                   {productName}
                 </p>
               </div>
@@ -88,18 +86,12 @@ export default function RestockModal({
         <div className="space-y-4 px-6 pt-4 pb-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">
-                STOCK SEKARANG
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-500">STOCK SEKARANG</p>
 
               <div className="mt-2 flex items-end gap-2">
-                <span className="text-[34px] font-black leading-none text-indigo-600">
-                  {baseStock}
-                </span>
+                <span className="text-[34px] font-black leading-none text-indigo-600">{baseStock}</span>
 
-                <span className="pb-1 text-[22px] font-bold text-indigo-500">
-                  pcs
-                </span>
+                <span className="pb-1 text-[22px] font-bold text-indigo-500">{unit}</span>
               </div>
             </div>
 
@@ -112,9 +104,7 @@ export default function RestockModal({
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Kurangi Stock
-            </label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Kurangi Stock</label>
 
             <input
               type="text"
@@ -127,9 +117,7 @@ export default function RestockModal({
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Supplier
-            </label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Supplier</label>
 
             <input
               value={supplier}
@@ -139,9 +127,7 @@ export default function RestockModal({
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Catatan
-            </label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Catatan</label>
 
             <textarea
               rows={3}
@@ -159,18 +145,14 @@ export default function RestockModal({
             <div className="mt-3 flex items-center gap-3">
               <span className="text-[30px] font-black text-slate-800 leading-none">
                 {baseStock}
-                <span className="ml-1 text-[18px] font-bold">pcs</span>
+                <span className="ml-1 text-[18px] font-bold">{unit}</span>
               </span>
 
               <span className="text-2xl font-light text-slate-400">→</span>
 
-              <span
-                className={`text-[30px] font-black leading-none ${
-                  hasInput ? "text-red-600" : "text-slate-500"
-                }`}
-              >
+              <span className={`text-[30px] font-black leading-none ${hasInput ? "text-red-600" : "text-slate-500"}`}>
                 {previewStock}
-                <span className="ml-1 text-[18px] font-bold">pcs</span>
+                <span className="ml-1 text-[18px] font-bold">{unit}</span>
               </span>
             </div>
           </div>
@@ -178,7 +160,7 @@ export default function RestockModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-             className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:translate-y-px"
+              className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 font-semibold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm active:translate-y-px"
             >
               Batal
             </button>

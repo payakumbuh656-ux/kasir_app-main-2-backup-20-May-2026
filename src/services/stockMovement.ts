@@ -10,6 +10,8 @@ interface StockMovementParams {
   type: "RESTOCK" | "SALE" | "RETURN" | "REDUCE" | "ADJUSTMENT" | "CREATE" | "EDIT";
   qty: number;
 
+  unit?: string;
+
   previousStock: number;
   currentStock: number;
 
@@ -51,6 +53,7 @@ export async function createStockMovement({
 
   type,
   qty,
+  unit,
 
   previousStock,
   currentStock,
@@ -75,6 +78,7 @@ export async function createStockMovement({
     type,
 
     qty,
+    unit: unit ?? null,
 
     previousStock,
     currentStock,

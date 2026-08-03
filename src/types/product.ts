@@ -29,4 +29,20 @@ export interface Product {
    * Bersifat opsional agar tetap kompatibel dengan data lama.
    */
   sold?: number;
+
+  /**
+   * Informasi faktur pembelian.
+   */
+  invoiceDate?: string;
+  invoiceNumber?: string;
+  invoiceNote?: string;
+
+  /**
+   * Informasi tambahan pembelian.
+   */
+  invoiceDate?: string;
+
+  invoiceNumber?: string;
+
+  invoiceNote?: string;
 }

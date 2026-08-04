@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { truncateText } from "./lib/truncateText";
 import useBarcodeScanner from "./core/useBarcodeScanner";
 import { createStockMovement } from "./services/stockMovement";
@@ -18,6 +18,7 @@ import SettingsMenu from "./components/settings/SettingsMenu";
 import PrinterSettings from "./components/settings/PrinterSettings";
 import StaffSettings from "./components/settings/StaffSettings";
 import { subscribeStaff } from "./modules/staff/service";
+import InvoiceCalendar from "./components/InvoiceCalendar";
 import { DEFAULT_CATEGORIES } from "./constants/defaultCategories";
 import { DEFAULT_UNITS } from "./constants/defaultUnits";
 import { verifyOwnerPin, hasOwnerPin, setOwnerPin } from "./modules/owner";
@@ -41,6 +42,8 @@ import OperatorCard from "./components/auth/OperatorCard";
 import type { Product } from "./types/product";
 import type { CartItem } from "./types/cart";
 import { ResponsiveContainer, LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 
 import {
   ShoppingCart,
@@ -84,6 +87,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  limit,
 } from "firebase/firestore";
 
 import StockInspector from "./components/StockInspector";
@@ -103,6 +107,21 @@ const OperationType = {
   LIST: "LIST",
   DELETE: "DELETE",
 };
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const DEFAULT_PRODUCTS: Product[] = [
   {
@@ -141,6 +160,7 @@ const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 export default function App() {
+  console.count("APP RENDER");
   const [user, setUser] = useState<any>(null);
 
   const [storeName, setStoreName] = useState("");
@@ -580,6 +600,16 @@ export default function App() {
     const unsubProducts = onSnapshot(
       collection(db, "users", user.uid, "products"),
       (snapshot) => {
+        console.count("[Products Snapshot]");
+        console.log(
+          "[Products]",
+          "docs:",
+          snapshot.size,
+          "fromCache:",
+          snapshot.metadata.fromCache,
+          "pendingWrites:",
+          snapshot.metadata.hasPendingWrites
+        );
         const items = snapshot.docs.map(
           (doc) =>
             ({
@@ -593,11 +623,8 @@ export default function App() {
       (error) => handleFirestoreError(error)
     );
 
-    const categoriesRef = collection(db, "users", user.uid, "categories");
-
-    const unsubCategories = onSnapshot(
-      categoriesRef,
-      (snapshot) => {
+    getDocs(collection(db, "users", user.uid, "categories"))
+      .then((snapshot) => {
         const userCategories = snapshot.docs
           .map((doc) => {
             const data = doc.data();
@@ -613,15 +640,11 @@ export default function App() {
         ];
 
         setCategories(mergedCategories);
-      },
-      (error) => handleFirestoreError(error)
-    );
+      })
+      .catch(handleFirestoreError);
 
-    const unitsRef = collection(db, "users", user.uid, "units");
-
-    const unsubUnits = onSnapshot(
-      unitsRef,
-      (snapshot) => {
+    getDocs(collection(db, "users", user.uid, "units"))
+      .then((snapshot) => {
         const userUnits = snapshot.docs
           .map((doc) => {
             const data = doc.data();
@@ -637,13 +660,22 @@ export default function App() {
         ];
 
         setUnits(mergedUnits);
-      },
-      (error) => handleFirestoreError(error)
-    );
+      })
+      .catch(handleFirestoreError);
 
     const unsubTransactions = onSnapshot(
       query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")),
       (snapshot) => {
+        console.count("[Transactions Snapshot]");
+        console.log(
+          "[Transactions]",
+          "docs:",
+          snapshot.size,
+          "fromCache:",
+          snapshot.metadata.fromCache,
+          "pendingWrites:",
+          snapshot.metadata.hasPendingWrites
+        );
         const items = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -657,6 +689,16 @@ export default function App() {
     const unsubMovements = onSnapshot(
       query(collection(db, "users", user.uid, "movements"), orderBy("createdAt", "desc")),
       (snapshot) => {
+        console.count("[Transactions Snapshot]");
+        console.log(
+          "[Movements]",
+          "docs:",
+          snapshot.size,
+          "fromCache:",
+          snapshot.metadata.fromCache,
+          "pendingWrites:",
+          snapshot.metadata.hasPendingWrites
+        );
         setStockMovements(
           snapshot.docs.map((doc) => ({
             id: doc.id,
@@ -669,8 +711,6 @@ export default function App() {
 
     return () => {
       unsubProducts();
-      unsubCategories();
-      unsubUnits();
       unsubTransactions();
       unsubMovements();
     };
@@ -703,7 +743,25 @@ export default function App() {
   // States for Stock Management
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  const [showInvoiceCalendar, setShowInvoiceCalendar] = useState(false);
+
+  const [draftInvoiceDate, setDraftInvoiceDate] = useState("");
+
+  const [showMonthMenu, setShowMonthMenu] = useState(false);
+
+  const [showYearMenu, setShowYearMenu] = useState(false);
+  const [invoiceCalendarPosition, setInvoiceCalendarPosition] = useState({
+    top: 0,
+    left: 0,
+  });
   const selectedProduct = products.find((p) => p.id === selectedProductId) ?? null;
+
+  const selectedMovements = useMemo(() => {
+    if (!selectedProduct) return [];
+
+    return stockMovements.filter((m) => m.productId === selectedProduct.id);
+  }, [stockMovements, selectedProduct]);
 
   const [isImagePanelOpen, setIsImagePanelOpen] = useState(false);
   const [productImagePreview, setProductImagePreview] = useState("");
@@ -1600,6 +1658,38 @@ export default function App() {
     setAdjustmentNote("");
 
     setIsAdjustmentModalOpen(true);
+  };
+
+  const handleUpdateInvoiceDate = async (invoiceDate: string) => {
+    if (!selectedProduct || !user) return;
+
+    try {
+      const updatedProduct = {
+        ...selectedProduct,
+        invoiceDate,
+      };
+
+      await setDoc(doc(db, "users", user.uid, "products", selectedProduct.id), updatedProduct);
+
+      showToast("Tanggal berdasarkan faktur berhasil diperbarui.");
+    } catch (error) {
+      console.error(error);
+      showToast("Gagal memperbarui tanggal faktur.");
+    }
+  };
+
+  const handleInvoiceCalendarSave = async (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    const value = `${year}-${month}-${day}`;
+
+    setDraftInvoiceDate(value);
+
+    await handleUpdateInvoiceDate(value);
+
+    setShowInvoiceCalendar(false);
   };
 
   const handleConfirmRestock = async () => {
@@ -2552,6 +2642,17 @@ export default function App() {
               <>
                 <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setSelectedProductId(null)} />
 
+                {showInvoiceCalendar && (
+                  <InvoiceCalendar
+                    value={draftInvoiceDate ? new Date(draftInvoiceDate) : undefined}
+                    onCancel={() => {
+                      setDraftInvoiceDate(selectedProduct?.invoiceDate ?? "");
+                      setShowInvoiceCalendar(false);
+                    }}
+                    onSave={handleInvoiceCalendarSave}
+                  />
+                )}
+
                 <div
                   key={selectedProduct?.id}
                   className="fixed inset-y-0 right-0 z-50 w-[390px] h-screen animate-in fade-in slide-in-from-right-2 duration-150"
@@ -2564,7 +2665,14 @@ export default function App() {
                     onReduceStock={handleInspectorReduceStock}
                     onAdjustment={handleInspectorAdjustment}
                     onDelete={handleInspectorDelete}
-                    movements={stockMovements.filter((m) => m.productId === selectedProduct.id)}
+                    onInvoiceDateChange={() => {
+                      if (!selectedProduct) return;
+
+                      setDraftInvoiceDate(selectedProduct.invoiceDate ?? "");
+
+                      setShowInvoiceCalendar(true);
+                    }}
+                    movements={selectedMovements}
                   />
                 </div>
               </>

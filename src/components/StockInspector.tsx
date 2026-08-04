@@ -1,5 +1,6 @@
 import StockMovementTimeline from "./StockMovementTimeline";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { CalendarDays } from "lucide-react";
 import {
   Activity,
   BadgeDollarSign,
@@ -50,6 +51,7 @@ type Props = {
   onReduceStock: () => void;
   onDelete: () => void;
   onAdjustment?: () => void;
+  onInvoiceDateChange?: () => void;
 };
 
 type StockMovement = {
@@ -75,6 +77,7 @@ export default function StockInspector({
   onReduceStock,
   onDelete,
   onAdjustment,
+  onInvoiceDateChange,
 }: Props) {
   if (!selectedProduct) {
     return null;
@@ -89,7 +92,10 @@ export default function StockInspector({
   const inventoryValue = modal * stock;
   const profit = price - modal;
   const margin = modal > 0 ? (profit / modal) * 100 : 0;
+
   const [showTimeline, setShowTimeline] = useState(false);
+
+  const invoiceDateInputRef = useRef<HTMLInputElement>(null);
 
   const PRODUCT_FIELD_LABELS: Record<string, string> = {
     name: "Nama Barang",
@@ -300,33 +306,20 @@ export default function StockInspector({
             <FileText size={18} className="mt-1 text-slate-400" />
 
             <div className="flex-1">
-              <p className="text-xs uppercase text-slate-400">Informasi Tambahan</p>
+              <p className="text-xs uppercase text-slate-400">Tanggal Berdasarkan Faktur</p>
 
-              {selectedProduct.invoiceDate || selectedProduct.invoiceNumber || selectedProduct.invoiceNote ? (
-                <div className="mt-2 space-y-3">
-                  <div>
-                    <p className="text-[11px] uppercase text-slate-400">Tanggal Faktur</p>
-
-                    <p className="font-semibold text-slate-900">{selectedProduct.invoiceDate || "-"}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] uppercase text-slate-400">Nomor Faktur</p>
-
-                    <p className="font-semibold text-slate-900">{selectedProduct.invoiceNumber || "-"}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] uppercase text-slate-400">Catatan Faktur</p>
-
-                    <p className="font-semibold text-slate-900 whitespace-pre-wrap">
-                      {selectedProduct.invoiceNote || "-"}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-2 text-sm text-slate-400 italic">Belum ada informasi tambahan.</p>
-              )}
+              <div className="relative mt-1">
+                <button
+                  type="button"
+                  onClick={onInvoiceDateChange}
+                  className={`w-full cursor-pointer rounded-lg border border-slate-200 px-3 py-2.5 text-left transition hover:border-indigo-500 ${
+                    selectedProduct.invoiceDate ? "text-slate-900" : "text-slate-400"
+                  }`}
+                >
+                  {selectedProduct.invoiceDate || "MM/DD/YY"}
+                </button>
+              </div>
+              <input ref={invoiceDateInputRef} type="date" className="hidden" />
             </div>
           </div>
 

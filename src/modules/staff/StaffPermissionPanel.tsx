@@ -1,5 +1,4 @@
-import type { StaffPermissions } from "../../../modules/staff/types";
-
+import type { StaffPermissions } from "./types";
 interface Props {
   permissions: StaffPermissions;
   onChange: (permissions: StaffPermissions) => void;

@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Minus } from "lucide-react";
 type Props = {
   open: boolean;
   onClose: () => void;
 
   qty: string;
-  setQty: React.Dispatch<React.SetStateAction<string>>;
+  setQty: Dispatch<SetStateAction<string>>
 
   supplier: string;
-  setSupplier: React.Dispatch<React.SetStateAction<string>>;
+  setSupplier: Dispatch<SetStateAction<string>>
 
   note: string;
-  setNote: React.Dispatch<React.SetStateAction<string>>;
+  setNote: Dispatch<SetStateAction<string>>
 
   currentStock: number;
   currentUnit?: string;

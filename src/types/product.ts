@@ -36,13 +36,4 @@ export interface Product {
   invoiceDate?: string;
   invoiceNumber?: string;
   invoiceNote?: string;
-
-  /**
-   * Informasi tambahan pembelian.
-   */
-  invoiceDate?: string;
-
-  invoiceNumber?: string;
-
-  invoiceNote?: string;
 }

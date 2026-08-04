@@ -22,7 +22,6 @@ import { DEFAULT_CATEGORIES } from "./constants/defaultCategories";
 import { DEFAULT_UNITS } from "./constants/defaultUnits";
 import { verifyOwnerPin, hasOwnerPin, setOwnerPin } from "./modules/owner";
 import ProductFormMain from "./components/product/ProductFormMain";
-import ProductFormAdditional from "./components/product/ProductFormAdditional";
 import { canAccess } from "./modules/staff/permissions";
 import { getCurrentActor } from "./modules/staff/actor";
 import type { Staff } from "./modules/staff/types";
@@ -40,6 +39,7 @@ import OperatorGate from "./components/auth/OperatorGate";
 import OwnerPinModal from "./components/auth/OwnerPinModal";
 import OperatorCard from "./components/auth/OperatorCard";
 import type { Product } from "./types/product";
+import type { CartItem } from "./types/cart";
 import { ResponsiveContainer, LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 import {
@@ -57,6 +57,7 @@ import {
   Barcode,
   Save,
   X,
+  PenLine,
   Edit2,
   Printer,
   PieChart,
@@ -103,10 +104,6 @@ const OperationType = {
   DELETE: "DELETE",
 };
 
-interface CartItem extends Product {
-  quantity: number;
-}
-
 const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "1",
@@ -127,6 +124,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 3100,
     modal: 2500,
     stock: 100,
+    initialStock: 100,
     category: "Makanan",
   },
   {
@@ -137,6 +135,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 15000,
     modal: 12500,
     stock: 12,
+    initialStock: 12,
     category: "Makanan",
   },
 ];
@@ -181,6 +180,8 @@ export default function App() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  const [expandedDiscountId, setExpandedDiscountId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [stockMovements, setStockMovements] = useState<any[]>([]);
   const [selectedOutlet, setSelectedOutlet] = useState("Outlet Pusat");
@@ -679,6 +680,12 @@ export default function App() {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+
+  const [manualTotal, setManualTotal] = useState<number | null>(null);
+
+  const [manualTotalInput, setManualTotalInput] = useState("");
+
   const [paymentMethod, setPaymentMethod] = useState("Tunai");
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
@@ -746,6 +753,7 @@ export default function App() {
   const [restockNote, setRestockNote] = useState("");
 
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+
   const [editingQty, setEditingQty] = useState("");
 
   const [reduceQty, setReduceQty] = useState("");
@@ -962,6 +970,8 @@ export default function App() {
         {
           ...product,
           quantity: 1,
+          discountPercent: 0,
+          discountEnabled: false,
         },
       ];
     });
@@ -1009,11 +1019,82 @@ export default function App() {
     );
   };
 
+  const getDiscountedUnitPrice = (item: CartItem) => {
+    if (!item.discountEnabled) {
+      return item.price;
+    }
+
+    return Math.round(item.price * (1 - item.discountPercent / 100));
+  };
+
+  const getCartItemTotal = (item: CartItem) => {
+    return getDiscountedUnitPrice(item) * item.quantity;
+  };
+
+  const getCartSubtotal = () => {
+    return cart.reduce((total, item) => total + getCartItemTotal(item), 0);
+  };
+
+  const totalTagihan = manualTotal ?? getCartSubtotal();
+
+  const getCartDiscountTotal = () => {
+    return cart.reduce((total, item) => {
+      const original = item.price * item.quantity;
+
+      const final = getCartItemTotal(item);
+
+      return total + (original - final);
+    }, 0);
+  };
+
+  const originalSubtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+
+  const discountTotal = getCartDiscountTotal();
+
+  const overrideAmount = manualTotal === null ? 0 : Math.max(0, getCartSubtotal() - totalTagihan);
+
+  const updateCartDiscount = (id: string, percent: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+
+        return {
+          ...item,
+          discountPercent: Math.max(0, Math.min(100, percent)),
+        };
+      })
+    );
+  };
+
+  const toggleCartDiscount = (id: string) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+
+        // Jika sedang ON lalu dimatikan
+        if (item.discountEnabled) {
+          return {
+            ...item,
+            discountEnabled: false,
+            discountPercent: 0,
+          };
+        }
+
+        // Jika sedang OFF lalu dihidupkan
+        return {
+          ...item,
+          discountEnabled: true,
+        };
+      })
+    );
+  };
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [productPage, setProductPage] = useState<"main" | "additional">("main");
 
   const handleCheckout = async () => {
-    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const subtotal = totalTagihan;
+
     if (paidAmount < subtotal) {
       showToast("Uang pelanggan kurang!");
       return;
@@ -1029,11 +1110,28 @@ export default function App() {
       items: cart.map((it) => ({
         id: it.id,
         name: it.name,
+
+        // harga asli (tetap disimpan)
         price: it.price,
+
+        // diskon item
+        discountPercent: it.discountPercent,
+
+        // harga setelah diskon
+        finalPrice: getDiscountedUnitPrice(it),
+
         quantity: it.quantity,
+
+        // total item setelah diskon
+        total: getCartItemTotal(it),
       })),
 
       total: subtotal,
+      subtotalOriginal: getCartSubtotal(),
+
+      isManualOverride: manualTotal !== null,
+
+      overrideAmount: manualTotal === null ? 0 : getCartSubtotal() - totalTagihan,
 
       // Return accounting
       returnedAmount: 0,
@@ -1059,6 +1157,15 @@ export default function App() {
         actorType: actor.actorType,
         actorRole: actor.actorRole,
       },
+      manualOverrideBy:
+        manualTotal !== null
+          ? {
+              actorId: actor.actorId,
+              actorName: actor.actorName,
+              actorType: actor.actorType,
+              actorRole: actor.actorRole,
+            }
+          : null,
     };
 
     try {
@@ -1106,6 +1213,11 @@ export default function App() {
 
       setLastTransaction(newTransaction);
       setCart([]);
+
+      setManualTotal(null);
+      setManualTotalInput("");
+      setIsEditingTotal(false);
+
       setIsCheckoutModalOpen(false);
       setIsReceiptModalOpen(true);
       setPaidAmount(0);
@@ -1775,8 +1887,8 @@ export default function App() {
     }
   };
 
-  const supplierSuggestions = [
-    ...new Set(
+  const supplierSuggestions: string[] = [
+    ...new Set<string>(
       products.map((p) => p.supplier).filter((supplier): supplier is string => !!supplier && supplier.trim() !== "")
     ),
   ];
@@ -2004,90 +2116,139 @@ export default function App() {
                   </div>
                 ) : (
                   cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-sm truncate uppercase">{item.name}</h4>
-                        <p className="text-xs text-slate-400">Rp {item.price.toLocaleString("id-ID")}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateCartQty(item.id, -1)}
-                          className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        {editingQtyId === item.id ? (
-                          <input
-                            autoFocus
-                            type="number"
-                            min={1}
-                            max={item.stock}
-                            inputMode="numeric"
-                            className="w-12 text-center text-sm font-bold border border-indigo-400 rounded-md outline-none"
-                            value={editingQty}
-                            onChange={(e) => {
-                              const value = e.target.value;
+                    <div key={item.id} className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                      <div className="flex items-center space-x-3 p-3">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-sm truncate uppercase">{item.name}</h4>
+                          <p className="text-xs text-slate-400">Rp {item.price.toLocaleString("id-ID")}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => updateCartQty(item.id, -1)}
+                            className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          {editingQtyId === item.id ? (
+                            <input
+                              autoFocus
+                              type="number"
+                              min={1}
+                              max={item.stock}
+                              inputMode="numeric"
+                              className="w-12 text-center text-sm font-bold border border-indigo-400 rounded-md outline-none"
+                              value={editingQty}
+                              onChange={(e) => {
+                                const value = e.target.value;
 
-                              if (value === "") {
-                                setEditingQty("");
-                                return;
-                              }
+                                if (value === "") {
+                                  setEditingQty("");
+                                  return;
+                                }
 
-                              const qty = Math.max(1, Math.min(Number(value), item.stock));
+                                const qty = Math.max(1, Math.min(Number(value), item.stock));
 
-                              setEditingQty(qty.toString());
-                            }}
-                            onBlur={() => {
-                              const qty = Number(editingQty);
-
-                              updateCartQtyDirect(item.id, qty);
-
-                              setEditingQtyId(null);
-                              setEditingQty("");
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
+                                setEditingQty(qty.toString());
+                              }}
+                              onBlur={() => {
                                 const qty = Number(editingQty);
 
                                 updateCartQtyDirect(item.id, qty);
 
                                 setEditingQtyId(null);
                                 setEditingQty("");
-                              }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const qty = Number(editingQty);
 
-                              if (e.key === "Escape") {
-                                setEditingQtyId(null);
-                                setEditingQty("");
-                              }
-                            }}
-                          />
-                        ) : (
+                                  updateCartQtyDirect(item.id, qty);
+
+                                  setEditingQtyId(null);
+                                  setEditingQty("");
+                                }
+
+                                if (e.key === "Escape") {
+                                  setEditingQtyId(null);
+                                  setEditingQty("");
+                                }
+                              }}
+                            />
+                          ) : (
+                            <button
+                              className="w-12 text-center text-sm font-bold"
+                              onClick={() => {
+                                setEditingQtyId(item.id);
+                                setEditingQty(item.quantity.toString());
+                              }}
+                            >
+                              {item.quantity}
+                            </button>
+                          )}
                           <button
-                            className="w-12 text-center text-sm font-bold"
-                            onClick={() => {
-                              setEditingQtyId(item.id);
-                              setEditingQty(item.quantity.toString());
-                            }}
+                            onClick={() => updateCartQty(item.id, 1)}
+                            className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
                           >
-                            {item.quantity}
+                            <Plus size={12} />
                           </button>
-                        )}
+                          <button
+                            onClick={() => toggleCartDiscount(item.id)}
+                            className={`w-6 h-6 rounded-md border flex items-center justify-center text-[10px] font-black transition-all ${
+                              item.discountEnabled
+                                ? "bg-indigo-600 border-indigo-600 text-white"
+                                : "bg-white border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300"
+                            }`}
+                          >
+                            %
+                          </button>
+                        </div>
                         <button
-                          onClick={() => updateCartQty(item.id, 1)}
-                          className="w-6 h-6 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600"
+                          onClick={() => setCart((c) => c.filter((x) => x.id !== item.id))}
+                          className="text-slate-300 hover:text-red-500"
                         >
-                          <Plus size={12} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
-                      <button
-                        onClick={() => setCart((c) => c.filter((x) => x.id !== item.id))}
-                        className="text-slate-300 hover:text-red-500"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {item.discountEnabled && (
+                        <div className="border-t border-slate-200 bg-slate-100 px-3 py-2">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span className="font-bold">DISC</span>
+
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">Rp {item.price.toLocaleString("id-ID")}</span>
+
+                              <span>→</span>
+
+                              <span className="font-bold text-indigo-600">
+                                Rp {getDiscountedUnitPrice(item).toLocaleString("id-ID")}
+                              </span>
+
+                              <div className="flex items-center rounded-md border border-slate-300 bg-white px-2 py-0.5">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={item.discountPercent === 0 ? "" : item.discountPercent}
+                                  onFocus={(e) => {
+                                    if (item.discountPercent === 0) {
+                                      e.target.select();
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, "");
+
+                                    const percent = raw === "" ? 0 : Math.min(100, Number(raw));
+
+                                    updateCartDiscount(item.id, percent);
+                                  }}
+                                  className="w-10 bg-transparent text-center text-[11px] font-bold outline-none"
+                                />
+
+                                <span className="ml-1 text-[11px] font-bold">%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -2095,13 +2256,17 @@ export default function App() {
               <div className="shrink-0 p-6 bg-slate-900 text-white rounded-t-3xl">
                 <div className="flex justify-between text-sm text-slate-400 mb-4 font-bold">
                   <span>TOTAL HARGA</span>
-                  <span className="text-white text-2xl font-black">
-                    Rp {cart.reduce((a, b) => a + b.price * b.quantity, 0).toLocaleString("id-ID")}
-                  </span>
+                  <span className="text-white text-2xl font-black">Rp {getCartSubtotal().toLocaleString("id-ID")}</span>
                 </div>
                 <button
                   disabled={cart.length === 0 || !canAccess("checkout")}
-                  onClick={() => setIsCheckoutModalOpen(true)}
+                  onClick={() => {
+                    setManualTotal(null);
+                    setManualTotalInput("");
+                    setIsEditingTotal(false);
+
+                    setIsCheckoutModalOpen(true);
+                  }}
                   className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CreditCard size={20} />
@@ -3179,21 +3344,129 @@ export default function App() {
 
       {/* Checkout Modal */}
       {isCheckoutModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 animate-in zoom-in-95 duration-200">
-            <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
+        <div className="fixed inset-0 bg-slate-900/25 flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-3xl px-8 pt-7 pb-6 animate-in zoom-in-95 duration-200">
+            <header className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-5">
               <h2 className="text-xl font-bold flex items-center">Konfirmasi Pembayaran</h2>
-              <button onClick={() => setIsCheckoutModalOpen(false)} className="text-slate-400 hover:text-red-500">
+              <button
+                onClick={() => {
+                  setManualTotal(null);
+                  setManualTotalInput("");
+                  setIsEditingTotal(false);
+
+                  setIsCheckoutModalOpen(false);
+                }}
+                className="text-slate-400 hover:text-red-500"
+              >
                 <X size={24} />
               </button>
             </header>
 
-            <div className="space-y-6">
-              <div className="p-4 bg-slate-50 rounded-2xl">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Total Tagihan</p>
-                <p className="text-3xl font-black text-indigo-600">
-                  Rp {cart.reduce((a, b) => a + b.price * b.quantity, 0).toLocaleString("id-ID")}
-                </p>
+            <div className="space-y-4">
+              <div className="px-4 pt-2.5 pb-3 bg-slate-50 rounded-2xl space-y-1">
+                <div className="flex justify-between items-center text-sm text-slate-500 mb-1">
+                  <span>Subtotal</span>
+                  <span>Rp {originalSubtotal.toLocaleString("id-ID")}</span>
+                </div>
+
+                {discountTotal > 0 && (
+                  <div className="flex justify-between items-center text-sm text-red-500 font-semibold mt-1">
+                    <span>Diskon</span>
+                    <span>-Rp {discountTotal.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+
+                {overrideAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm font-semibold text-amber-600 mt-1">
+                    <span>Penyesuaian</span>
+                    <span>-Rp {overrideAmount.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-200 pt-3 pb-2 mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold uppercase tracking-wide text-slate-500">TOTAL</span>
+
+                    {!isEditingTotal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingTotal(true);
+                          setManualTotalInput(totalTagihan.toString());
+                        }}
+                        className="transition-colors"
+                      >
+                        <PenLine
+                          size={16}
+                          className={
+                            manualTotal === null
+                              ? "text-slate-400 transition-colors hover:text-indigo-500"
+                              : "text-amber-500"
+                          }
+                        />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-1">
+                    {isEditingTotal ? (
+                      <div className="relative w-full">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">Rp</span>
+
+                        <input
+                          autoFocus
+                          type="text"
+                          inputMode="numeric"
+                          value={manualTotalInput ? Number(manualTotalInput).toLocaleString("id-ID") : ""}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, "");
+                            setManualTotalInput(raw);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const value = Number(manualTotalInput || "0");
+                              const subtotal = getCartSubtotal();
+
+                              if (value === subtotal) {
+                                setManualTotal(null);
+                              } else {
+                                setManualTotal(value);
+                              }
+
+                              setIsEditingTotal(false);
+                            }
+
+                            if (e.key === "Escape") {
+                              setManualTotalInput(manualTotal !== null ? String(manualTotal) : "");
+                              setIsEditingTotal(false);
+                            }
+                          }}
+                          onBlur={() => {
+                            const value = Number(manualTotalInput || "0");
+                            const subtotal = getCartSubtotal();
+
+                            if (value === subtotal) {
+                              setManualTotal(null);
+                            } else {
+                              setManualTotal(value);
+                            }
+
+                            setIsEditingTotal(false);
+                          }}
+                          className="w-full bg-transparent border-none shadow-none py-0 pl-10 text-[46px] leading-[0.95] font-black tabular-nums outline-none focus:ring-0"
+                        />
+                      </div>
+                    ) : (
+                      <span
+                        className={`block text-[40px] leading-[0.95] font-black ${
+                          manualTotal !== null ? "text-amber-600" : "text-indigo-600"
+                        }`}
+                      >
+                        Rp {totalTagihan.toLocaleString("id-ID")}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="mb-4">
@@ -3277,7 +3550,7 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    const totalBelanja = cart.reduce((a, b) => a + b.price * b.quantity, 0);
+                    const totalBelanja = totalTagihan;
 
                     setPaidAmount(totalBelanja);
                   }}
@@ -3288,7 +3561,7 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    const totalBelanja = cart.reduce((a, b) => a + b.price * b.quantity, 0);
+                    const totalBelanja = totalTagihan;
 
                     setPaidAmount(Math.ceil(totalBelanja / 50000) * 50000);
                   }}
@@ -3309,17 +3582,14 @@ export default function App() {
                 <div className="flex justify-between items-center p-4 rounded-2xl bg-green-50 border border-green-100">
                   <span className="font-bold text-green-700">Kembalian:</span>
                   <span className="text-xl font-black text-green-700">
-                    Rp{" "}
-                    {Math.max(0, paidAmount - cart.reduce((a, b) => a + b.price * b.quantity, 0)).toLocaleString(
-                      "id-ID"
-                    )}
+                    Rp {Math.max(0, paidAmount - totalTagihan).toLocaleString("id-ID")}
                   </span>
                 </div>
               )}
 
               <button
                 onClick={handleCheckout}
-                disabled={isProcessing || paidAmount < cart.reduce((a, b) => a + b.price * b.quantity, 0)}
+                disabled={isProcessing || paidAmount < totalTagihan}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-100"
               >
                 <span>{isProcessing ? "MEMPROSES..." : "PROSES TRANSAKSI"}</span>
@@ -3425,12 +3695,12 @@ export default function App() {
                         <p className="font-bold text-slate-900 break-words leading-snug">{item.name}</p>
 
                         <p className="text-sm text-slate-500">
-                          {item.quantity} x Rp {item.price?.toLocaleString("id-ID")}
+                          {item.quantity} x Rp {(item.finalPrice ?? item.price)?.toLocaleString("id-ID")}
                         </p>
                       </div>
 
                       <p className="font-black text-indigo-600 whitespace-nowrap ml-4">
-                        Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                        Rp {(item.total ?? (item.finalPrice ?? item.price) * item.quantity).toLocaleString("id-ID")}
                       </p>
                     </div>
                   ))}

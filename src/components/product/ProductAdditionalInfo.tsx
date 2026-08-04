@@ -1,9 +1,10 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
+import type { ReactNode } from "react";
 
 type ProductAdditionalInfoProps = {
   expanded: boolean;
   onToggle: () => void;
-  children?: React.ReactNode;
+  children?: ReactNode;
 };
 
 export default function ProductAdditionalInfo({ expanded, onToggle, children }: ProductAdditionalInfoProps) {

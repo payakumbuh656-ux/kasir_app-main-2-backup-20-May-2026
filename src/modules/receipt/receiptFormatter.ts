@@ -1,8 +1,4 @@
-import type {
-  ReceiptData,
-  StoreInfo,
-  CashierInfo,
-} from "./receiptTypes";
+import type { ReceiptData, StoreInfo, CashierInfo } from "./receiptTypes";
 
 interface TransactionData {
   id: string;
@@ -14,16 +10,20 @@ interface TransactionData {
   items: {
     id: string;
     name: string;
+
     price: number;
+
+    discountPercent?: number;
+
+    finalPrice?: number;
+
     quantity: number;
+
+    total?: number;
   }[];
 }
 
-export function formatReceipt(
-  transaction: TransactionData,
-  store: StoreInfo,
-  cashier: CashierInfo
-): ReceiptData {
+export function formatReceipt(transaction: TransactionData, store: StoreInfo, cashier: CashierInfo): ReceiptData {
   return {
     invoiceNo: transaction.id,
 
@@ -35,10 +35,14 @@ export function formatReceipt(
 
     items: transaction.items.map((item) => ({
       id: item.id,
+
       name: item.name,
+
       quantity: item.quantity,
-      unitPrice: item.price,
-      total: item.price * item.quantity,
+
+      unitPrice: item.finalPrice ?? item.price,
+
+      total: item.total ?? (item.finalPrice ?? item.price) * item.quantity,
     })),
 
     totals: {
@@ -54,9 +58,6 @@ export function formatReceipt(
       changeAmount: transaction.changeAmount,
     },
 
-    footer: [
-      "Terima kasih atas kunjungan Anda",
-      "Powered by IndoTech POS",
-    ],
+    footer: ["Terima kasih atas kunjungan Anda", "Powered by IndoTech POS"],
   };
 }

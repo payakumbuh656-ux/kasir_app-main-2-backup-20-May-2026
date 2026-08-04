@@ -43,3 +43,56 @@ export const DEFAULT_RECEIPT_SETTINGS: ReceiptSettings = {
   footerLine2: "",
   footerLine3: "",
 };
+/* ============================================================
+ * Receipt Engine Types
+ * ============================================================ */
+
+export interface StoreInfo {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  npwp?: string;
+}
+
+export interface CashierInfo {
+  id?: string;
+  name: string;
+}
+
+export interface ReceiptItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface ReceiptTotals {
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+}
+
+export interface ReceiptPayment {
+  method: "cash" | "qris" | "transfer";
+  paidAmount: number;
+  changeAmount: number;
+}
+
+export interface ReceiptData {
+  invoiceNo: string;
+  transactionDate: Date;
+
+  store: StoreInfo;
+  cashier: CashierInfo;
+
+  items: ReceiptItem[];
+
+  totals: ReceiptTotals;
+
+  payment: ReceiptPayment;
+
+  footer?: string[];
+}

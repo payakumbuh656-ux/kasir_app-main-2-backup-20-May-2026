@@ -79,9 +79,7 @@ function formatTimelineDate(createdAt: any) {
 
 export default function StockMovementTimeline({ movements }: Props) {
   const [activityFilter, setActivityFilter] = useState("ALL");
-  const [highlightedMovementId, setHighlightedMovementId] = useState<
-    string | null
-  >(null);
+  const [highlightedMovementId, setHighlightedMovementId] = useState<string | null>(null);
   const [pendingFocusType, setPendingFocusType] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -100,9 +98,7 @@ export default function StockMovementTimeline({ movements }: Props) {
         behavior: "smooth",
       });
 
-      const firstMovement = movements.find(
-        (movement) => movement.type === type,
-      );
+      const firstMovement = movements.find((movement) => movement.type === type);
 
       if (!firstMovement) return;
 
@@ -132,7 +128,7 @@ export default function StockMovementTimeline({ movements }: Props) {
 
         return acc;
       },
-      {} as Record<string, StockMovement[]>,
+      {} as Record<string, StockMovement[]>
     );
   }, [filteredMovements]);
 
@@ -149,24 +145,24 @@ export default function StockMovementTimeline({ movements }: Props) {
 
         return acc;
       },
-      {} as Record<string, StockMovement[]>,
+      {} as Record<string, StockMovement[]>
     );
   }, [movements]);
 
   const groupSummaries = useMemo(() => {
     return Object.fromEntries(
-      Object.entries(groupedSummaryMovements).map(([group, items]) => {
+      Object.entries(groupedSummaryMovements as Record<string, StockMovement[]>).map(([group, items]) => {
         const summary = items.reduce(
           (acc, movement) => {
             acc[movement.type] = (acc[movement.type] ?? 0) + 1;
 
             return acc;
           },
-          {} as Record<string, number>,
+          {} as Record<string, number>
         );
 
         return [group, summary];
-      }),
+      })
     );
   }, [groupedSummaryMovements]);
 
@@ -179,13 +175,9 @@ export default function StockMovementTimeline({ movements }: Props) {
           </div>
 
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900">
-              Riwayat Pergerakan Stok
-            </h2>
+            <h2 className="text-lg font-extrabold text-slate-900">Riwayat Pergerakan Stok</h2>
 
-            <p className="text-sm text-slate-500">
-              Seluruh aktivitas perubahan stok akan tercatat otomatis.
-            </p>
+            <p className="text-sm text-slate-500">Seluruh aktivitas perubahan stok akan tercatat otomatis.</p>
           </div>
         </div>
       </div>
@@ -216,51 +208,33 @@ export default function StockMovementTimeline({ movements }: Props) {
         </div>
       </div>
 
-      <div
-        ref={timelineRef}
-        className="max-h-[430px] overflow-y-auto overscroll-contain"
-      >
+      <div ref={timelineRef} className="max-h-[430px] overflow-y-auto overscroll-contain">
         {movements.length === 0 ? (
           <div className="p-6">
             <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-8 text-center shadow-sm">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-inner ring-1 ring-indigo-100">
-                <History
-                  size={34}
-                  strokeWidth={2.2}
-                  className="text-indigo-600"
-                />
+                <History size={34} strokeWidth={2.2} className="text-indigo-600" />
               </div>
 
-              <h3 className="mt-7 text-[24px] font-black tracking-tight text-slate-900">
-                Belum Ada Aktivitas
-              </h3>
+              <h3 className="mt-7 text-[24px] font-black tracking-tight text-slate-900">Belum Ada Aktivitas</h3>
 
               <p className="mx-auto mt-4 max-w-[290px] text-[15px] leading-7 text-slate-500">
-                Semua aktivitas seperti{" "}
-                <span className="font-semibold text-slate-700">Restock</span>,{" "}
+                Semua aktivitas seperti <span className="font-semibold text-slate-700">Restock</span>,{" "}
                 <span className="font-semibold text-slate-700">Penjualan</span>,{" "}
-                <span className="font-semibold text-slate-700">
-                  Penyesuaian
-                </span>
-                , <span className="font-semibold text-slate-700">Transfer</span>
-                , maupun{" "}
-                <span className="font-semibold text-slate-700">Retur</span> akan
-                tercatat otomatis di sini.
+                <span className="font-semibold text-slate-700">Penyesuaian</span>,{" "}
+                <span className="font-semibold text-slate-700">Transfer</span>, maupun{" "}
+                <span className="font-semibold text-slate-700">Retur</span> akan tercatat otomatis di sini.
               </p>
             </div>
           </div>
         ) : (
-          Object.entries(groupedMovements).map(([group, items]) => (
+          Object.entries(groupedMovements as Record<string, StockMovement[]>).map(([group, items]) => (
             <div key={group}>
               <div className="z-10 border-y border-slate-200 bg-slate-50/95 backdrop-blur">
                 <div className="px-6 py-4">
-                  <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
-                    {group}
-                  </h3>
+                  <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">{group}</h3>
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    Aktivitas pada periode ini
-                  </p>
+                  <p className="mt-1 text-xs text-slate-400">Aktivitas pada periode ini</p>
                 </div>
 
                 <ActivitySummary

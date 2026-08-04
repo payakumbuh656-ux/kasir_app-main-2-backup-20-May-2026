@@ -49,9 +49,7 @@ export default function SettingsPage({
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-indigo-600">Pengaturan</h1>
 
-        <p className="mt-2 text-slate-500">
-          Kelola seluruh konfigurasi IndoTech POS.
-        </p>
+        <p className="mt-2 text-slate-500">Kelola seluruh konfigurasi IndoTech POS.</p>
       </header>
 
       <SettingsMenu settingsTab={settingsTab} setSettingsTab={setSettingsTab} />
@@ -68,7 +66,7 @@ export default function SettingsPage({
         />
       )}
 
-      {settingsTab === "printer" && <PrinterSettings />}
+      {settingsTab === "printer" && <PrinterSettings darkMode={darkMode} />}
 
       {settingsTab === "staff" && <StaffSettings showToast={showToast} />}
 

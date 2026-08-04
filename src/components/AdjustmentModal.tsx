@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { Scale } from "lucide-react";
 type Props = {
   open: boolean;
   onClose: () => void;
 
   qty: string;
-  setQty: React.Dispatch<React.SetStateAction<string>>;
+  setQty: Dispatch<SetStateAction<string>>;
 
   reason: string;
-  setReason: React.Dispatch<React.SetStateAction<string>>;
+  setReason: Dispatch<SetStateAction<string>>;
 
   note: string;
-  setNote: React.Dispatch<React.SetStateAction<string>>;
+  setNote: Dispatch<SetStateAction<string>>;
 
   currentStock: number;
   currentUnit?: string;

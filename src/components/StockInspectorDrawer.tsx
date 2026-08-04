@@ -11,6 +11,8 @@ type Props = {
 
   onRestock: () => void;
 
+  onReduceStock: () => void;
+
   onDelete: () => void;
 
   onAdjustment: () => void;
@@ -29,6 +31,8 @@ export default function StockInspectorDrawer({
 
   onRestock,
 
+  onReduceStock,
+
   onDelete,
 
   onAdjustment,
@@ -39,17 +43,18 @@ export default function StockInspectorDrawer({
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
 
-      <div className="fixed inset-y-0 right-0 z-50 w-[390px]">
+      <div
+        key={selectedProduct.id}
+        className="fixed inset-y-0 right-0 z-50 w-[390px] h-screen overflow-y-auto overscroll-contain animate-in slide-in-from-right-4 fade-in duration-200"
+      >
         <StockInspector
           selectedProduct={selectedProduct}
           onClose={onClose}
           onEdit={onEdit}
           onRestock={onRestock}
+          onReduceStock={onReduceStock}
           onDelete={onDelete}
           onAdjustment={onAdjustment}
           movements={movements}

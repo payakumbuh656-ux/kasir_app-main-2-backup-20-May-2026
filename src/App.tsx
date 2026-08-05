@@ -17,7 +17,7 @@ import StoreSettings from "./components/settings/StoreSettings";
 import SettingsMenu from "./components/settings/SettingsMenu";
 import PrinterSettings from "./components/settings/PrinterSettings";
 import StaffSettings from "./components/settings/StaffSettings";
-import { subscribeStaff } from "./modules/staff/service";
+import { subscribeStaff, verifyStaffPin } from "./modules/staff/service";
 import InvoiceCalendar from "./components/InvoiceCalendar";
 import { DEFAULT_CATEGORIES } from "./constants/defaultCategories";
 import { DEFAULT_UNITS } from "./constants/defaultUnits";
@@ -160,7 +160,6 @@ const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 export default function App() {
-  console.count("APP RENDER");
   const [user, setUser] = useState<any>(null);
 
   const [storeName, setStoreName] = useState("");
@@ -600,16 +599,6 @@ export default function App() {
     const unsubProducts = onSnapshot(
       collection(db, "users", user.uid, "products"),
       (snapshot) => {
-        console.count("[Products Snapshot]");
-        console.log(
-          "[Products]",
-          "docs:",
-          snapshot.size,
-          "fromCache:",
-          snapshot.metadata.fromCache,
-          "pendingWrites:",
-          snapshot.metadata.hasPendingWrites
-        );
         const items = snapshot.docs.map(
           (doc) =>
             ({
@@ -666,16 +655,6 @@ export default function App() {
     const unsubTransactions = onSnapshot(
       query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")),
       (snapshot) => {
-        console.count("[Transactions Snapshot]");
-        console.log(
-          "[Transactions]",
-          "docs:",
-          snapshot.size,
-          "fromCache:",
-          snapshot.metadata.fromCache,
-          "pendingWrites:",
-          snapshot.metadata.hasPendingWrites
-        );
         const items = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -689,16 +668,6 @@ export default function App() {
     const unsubMovements = onSnapshot(
       query(collection(db, "users", user.uid, "movements"), orderBy("createdAt", "desc")),
       (snapshot) => {
-        console.count("[Transactions Snapshot]");
-        console.log(
-          "[Movements]",
-          "docs:",
-          snapshot.size,
-          "fromCache:",
-          snapshot.metadata.fromCache,
-          "pendingWrites:",
-          snapshot.metadata.hasPendingWrites
-        );
         setStockMovements(
           snapshot.docs.map((doc) => ({
             id: doc.id,
@@ -1744,8 +1713,6 @@ export default function App() {
   };
 
   const openReturnModal = (transaction: any) => {
-    console.log("RETURN CLICK TRANSACTION:", transaction);
-    console.log("RETURN CLICK ITEMS:", transaction.items);
     setSelectedTransaction(transaction);
 
     setReturnItems(
@@ -4163,7 +4130,14 @@ export default function App() {
           staff={staffList}
           loading={staffLoading}
           showOwnerMode={showOwnerMode}
-          onStartShift={(selectedStaff, pin) => {
+          onStartShift={async (selectedStaff, pin) => {
+            const valid = await verifyStaffPin(user.uid, selectedStaff.id, pin);
+
+            if (!valid) {
+              showToast("PIN operator salah.");
+              return;
+            }
+
             setOperatorSession(user.uid, selectedStaff);
             setIsOperatorGateOpen(false);
           }}

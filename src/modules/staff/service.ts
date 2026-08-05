@@ -1,6 +1,7 @@
-import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { Staff, StaffPermissions, DEFAULT_STAFF_PERMISSIONS } from "./types";
+import { hashPin } from "./hash";
 
 export async function getStaffList(ownerUid: string) {
   const snapshot = await getDocs(collection(db, "users", ownerUid, "staff"));
@@ -59,4 +60,27 @@ export async function updateStaffPermissions(ownerUid: string, staffId: string, 
 
 export async function deleteStaff(ownerUid: string, staffId: string) {
   await deleteDoc(doc(db, "users", ownerUid, "staff", staffId));
+}
+
+export async function updateStaffPin(ownerUid: string, staffId: string, pin: string) {
+  const pinHash = await hashPin(pin);
+
+  await updateDoc(doc(db, "users", ownerUid, "staff", staffId), {
+    pinHash,
+    updatedAt: new Date(),
+  });
+}
+
+export async function verifyStaffPin(ownerUid: string, staffId: string, pin: string) {
+  const snap = await getDoc(doc(db, "users", ownerUid, "staff", staffId));
+
+  if (!snap.exists()) {
+    return false;
+  }
+
+  const data = snap.data() as Staff;
+
+  const pinHash = await hashPin(pin);
+
+  return data.pinHash === pinHash;
 }

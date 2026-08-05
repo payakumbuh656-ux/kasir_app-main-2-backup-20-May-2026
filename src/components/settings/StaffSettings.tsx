@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, updateProfile } from "firebase/auth";
 import { Plus, Users } from "lucide-react";
 
 import { auth } from "../../lib/firebase";
-import { getStaffList, updateStaffPermissions } from "../../modules/staff";
+import { setOwnerPin } from "../../modules/owner";
+import { subscribeStaff, updateStaff, updateStaffPermissions, updateStaffPin, deleteStaff } from "../../modules/staff";
 import { getCurrentMode } from "../../modules/staff/session";
 import type { Staff } from "../../modules/staff";
 import StaffList from "./staff/StaffList";
+import OwnerCard from "./owner/OwnerCard";
 import StaffModal from "./staff/StaffModal";
+import PinModal from "./modals/PinModal";
+
+import AccountSettingsPanel from "./shared/AccountSettingsPanel";
+import RenameModal from "./modals/RenameModal";
 
 interface StaffSettingsProps {
   showToast: (message: string) => void;
@@ -17,6 +23,10 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
   const [staffs, setStaffs] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [isRenameOwnerOpen, setIsRenameOwnerOpen] = useState(false);
+  const [isOwnerPinOpen, setIsOwnerPinOpen] = useState(false);
+  const [ownerName, setOwnerName] = useState("");
+  const owner = auth.currentUser;
   async function handleUpdatePermissions(staffId: string, permissions: Staff["permissions"]) {
     const user = auth.currentUser;
 
@@ -38,38 +48,102 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
     showToast("Permission staff berhasil diperbarui.");
   }
 
-  async function loadStaff(ownerUid: string) {
-    setLoading(true);
+  async function handleRenameStaff(staffId: string, newName: string) {
+    const user = auth.currentUser;
 
-    try {
-      const list = await getStaffList(ownerUid);
+    if (!user) return;
 
-      setStaffs(list);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+    const name = newName.trim();
+
+    if (!name) {
+      showToast("Nama tidak boleh kosong.");
+      return;
     }
+
+    await updateStaff(user.uid, staffId, {
+      name,
+      updatedAt: new Date(),
+    });
+
+    showToast("Nama staff berhasil diperbarui.");
+  }
+
+  async function handleChangeStaffPin(staffId: string, pin: string) {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    await updateStaffPin(user.uid, staffId, pin);
+
+    showToast("PIN staff berhasil diperbarui.");
+  }
+
+  async function handleDeleteStaff(staffId: string) {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    await deleteStaff(user.uid, staffId);
+
+    showToast("Staff berhasil dihapus.");
+  }
+
+  async function handleRenameOwner(newName: string) {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    const name = newName.trim();
+
+    if (!name) {
+      showToast("Nama tidak boleh kosong.");
+      return;
+    }
+
+    await updateProfile(user, {
+      displayName: name,
+    });
+
+    setOwnerName(name);
+
+    showToast("Nama owner berhasil diperbarui.");
   }
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    let unsubStaff: (() => void) | undefined;
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setStaffs([]);
         setLoading(false);
+
+        if (unsubStaff) {
+          unsubStaff();
+          unsubStaff = undefined;
+        }
+
         return;
       }
+      setOwnerName(user.displayName ?? "Owner");
+      setLoading(true);
 
-      try {
-        await loadStaff(user.uid);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+      if (unsubStaff) {
+        unsubStaff();
       }
+
+      unsubStaff = subscribeStaff(user.uid, (list) => {
+        setStaffs(list);
+        setLoading(false);
+      });
     });
 
-    return () => unsub();
+    return () => {
+      unsubAuth();
+
+      if (unsubStaff) {
+        unsubStaff();
+      }
+    };
   }, []);
 
   const mode = getCurrentMode(auth.currentUser?.uid ?? "");
@@ -106,16 +180,10 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-300">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Total Staff</p>
+              <h2 className="text-5xl font-bold tracking-tight text-slate-800">1 Owner, {staffs.length} Staff</h2>
 
-              <div className="mt-3 flex items-end gap-2">
-                <span className="text-5xl font-bold tracking-tight text-slate-800">{staffs.length}</span>
-
-                <span className="pb-1 text-lg font-semibold text-slate-500">Staff</span>
-              </div>
-
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                Staff aktif yang memiliki akses ke sistem POS toko Anda.
+              <p className="mt-4 text-sm leading-6 text-slate-500">
+                Pengguna aktif yang memiliki akses ke sistem POS toko Anda.
               </p>
             </div>
 
@@ -125,11 +193,26 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
           </div>
         </div>
 
+        <OwnerCard ownerName={ownerName || owner?.displayName || "Owner"} ownerEmail={owner?.email || "-"} storeName="">
+          <AccountSettingsPanel
+            accountType="owner"
+            accountName={ownerName || owner?.displayName || "Owner"}
+            accountEmail={owner?.email || ""}
+            storeName="-"
+            onRename={() => setIsRenameOwnerOpen(true)}
+            onChangePin={() => setIsOwnerPinOpen(true)}
+          />
+        </OwnerCard>
+
         {/* Staff List */}
         <StaffList
           staffs={staffs}
           onAddStaff={() => setIsAddStaffOpen(true)}
           onUpdatePermissions={handleUpdatePermissions}
+          onRenameStaff={handleRenameStaff}
+          onChangeStaffPin={handleChangeStaffPin}
+          onDeleteStaff={handleDeleteStaff}
+          showToast={showToast}
         />
 
         <StaffModal
@@ -137,14 +220,33 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
           ownerUid={auth.currentUser?.uid ?? ""}
           onClose={() => setIsAddStaffOpen(false)}
           showToast={showToast}
-          onSaved={async () => {
+          onSaved={() => {
+            setIsAddStaffOpen(false);
+          }}
+        />
+        <RenameModal
+          open={isRenameOwnerOpen}
+          currentName={ownerName || owner?.displayName || ""}
+          onClose={() => setIsRenameOwnerOpen(false)}
+          onSave={async (newName) => {
+            await handleRenameOwner(newName);
+
+            setIsRenameOwnerOpen(false);
+          }}
+        />
+        <PinModal
+          open={isOwnerPinOpen}
+          onClose={() => setIsOwnerPinOpen(false)}
+          onSave={async (pin) => {
             const user = auth.currentUser;
 
             if (!user) return;
 
-            await loadStaff(user.uid);
+            await setOwnerPin(user.uid, pin);
 
-            setIsAddStaffOpen(false);
+            showToast("PIN owner berhasil diperbarui.");
+
+            setIsOwnerPinOpen(false);
           }}
         />
       </section>

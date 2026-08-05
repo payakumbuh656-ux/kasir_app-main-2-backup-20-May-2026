@@ -7,9 +7,22 @@ interface StaffListProps {
   onAddStaff: () => void;
 
   onUpdatePermissions: (staffId: string, permissions: Staff["permissions"]) => Promise<void>;
+
+  onRenameStaff: (staffId: string, newName: string) => Promise<void>;
+
+  onChangeStaffPin: (staffId: string, pin: string) => Promise<void>;
+
+  onDeleteStaff: (staffId: string) => Promise<void>;
 }
 
-export default function StaffList({ staffs, onAddStaff, onUpdatePermissions }: StaffListProps) {
+export default function StaffList({
+  staffs,
+  onAddStaff,
+  onUpdatePermissions,
+  onRenameStaff,
+  onChangeStaffPin,
+  onDeleteStaff,
+}: StaffListProps) {
   if (staffs.length === 0) {
     return (
       <div className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
@@ -36,7 +49,14 @@ export default function StaffList({ staffs, onAddStaff, onUpdatePermissions }: S
   return (
     <div className="space-y-4">
       {staffs.map((staff) => (
-        <StaffCard key={staff.id} staff={staff} onUpdatePermissions={onUpdatePermissions} />
+        <StaffCard
+          key={staff.id}
+          staff={staff}
+          onUpdatePermissions={onUpdatePermissions}
+          onRenameStaff={onRenameStaff}
+          onChangeStaffPin={onChangeStaffPin}
+          onDeleteStaff={onDeleteStaff}
+        />
       ))}
     </div>
   );

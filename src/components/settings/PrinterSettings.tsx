@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { PrinterService } from "../../modules/receipt/printer/PrinterService";
+import type { PrinterInfo } from "../../types/printer";
 
 interface PrinterSettingsProps {
   darkMode: boolean;
 }
 
 export default function PrinterSettings({ darkMode }: PrinterSettingsProps) {
-  const [printers, setPrinters] = useState<Electron.PrinterInfo[]>([]);
+  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
 
   useEffect(() => {
     async function loadPrinters() {

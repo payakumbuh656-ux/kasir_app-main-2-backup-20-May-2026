@@ -1,4 +1,4 @@
-export {};
+import type { PrinterInfo } from "./printer";
 
 declare global {
   interface Window {
@@ -10,7 +10,7 @@ declare global {
       };
 
       printer: {
-        getPrinters: () => Promise<Electron.PrinterInfo[]>;
+        getPrinters: () => Promise<PrinterInfo[]>;
       };
 
       updater: {

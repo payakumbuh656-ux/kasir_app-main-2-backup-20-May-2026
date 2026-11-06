@@ -14,7 +14,7 @@ export default function useBarcodeScanner({
   onScan,
 }: BarcodeScannerOptions) {
   const bufferRef = useRef("");
-  const timerRef = useRef<number>();
+  const timerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!enabled) return;

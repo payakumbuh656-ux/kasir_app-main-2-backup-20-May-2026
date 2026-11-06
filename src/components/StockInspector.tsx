@@ -51,7 +51,7 @@ type Props = {
   onReduceStock: () => void;
   onDelete: () => void;
   onAdjustment?: () => void;
-  onInvoiceDateChange?: () => void;
+  onInvoiceDateChange?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 type StockMovement = {

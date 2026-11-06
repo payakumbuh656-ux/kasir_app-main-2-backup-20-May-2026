@@ -78,6 +78,7 @@ export default function StaffCard({
           <AccountSettingsPanel
             accountType="staff"
             accountName={staff.name}
+            accountEmail=""
             role={staff.role}
             onRename={() => {
               setIsRenameOpen(true);

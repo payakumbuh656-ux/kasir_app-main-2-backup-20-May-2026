@@ -220,7 +220,7 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
           ownerUid={auth.currentUser?.uid ?? ""}
           onClose={() => setIsAddStaffOpen(false)}
           showToast={showToast}
-          onSaved={() => {
+          onSaved={async () => {
             setIsAddStaffOpen(false);
           }}
         />
@@ -236,6 +236,7 @@ export default function StaffSettings({ showToast }: StaffSettingsProps) {
         />
         <PinModal
           open={isOwnerPinOpen}
+          showToast={showToast}
           onClose={() => setIsOwnerPinOpen(false)}
           onSave={async (pin) => {
             const user = auth.currentUser;

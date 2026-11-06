@@ -78,8 +78,8 @@ export const Explorer: React.FC<ExplorerProps> = ({ files, onFileClick }) => {
             <span>REACT-EXAMPLE</span>
           </div>
           <div className="flex items-center space-x-2 text-[#cccccc] opacity-0 group-hover:opacity-100 transition-opacity">
-            <Plus size={14} title="New File" />
-            <FolderPlus size={14} title="New Folder" />
+            <span title="New File"><Plus size={14} /></span>
+            <span title="New Folder"><FolderPlus size={14} /></span>
           </div>
         </div>
         

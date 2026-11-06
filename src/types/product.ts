@@ -1,4 +1,9 @@
+import type { Timestamp } from "firebase/firestore";
+import type { POSActor } from "../modules/staff/actor";
+
 export interface Product {
+  createdAt?: Date | Timestamp;
+  createdBy?: POSActor;
   id: string;
   barcode: string;
   name: string;

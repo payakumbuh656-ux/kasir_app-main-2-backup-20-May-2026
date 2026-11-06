@@ -11,6 +11,8 @@ interface CreateReturnParams {
 
   totalRefund:number;
 
+  paymentMethod?:string;
+
   reason?:string;
 
   createdBy:any;
@@ -22,6 +24,7 @@ export async function createReturn({
   transactionId,
   items,
   totalRefund,
+  paymentMethod,
   reason,
   createdBy,
 }:CreateReturnParams){
@@ -34,6 +37,8 @@ export async function createReturn({
       items,
 
       totalRefund,
+
+      ...(paymentMethod ? { paymentMethod } : {}),
 
       reason: reason ?? "",
 

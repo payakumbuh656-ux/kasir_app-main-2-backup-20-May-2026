@@ -146,7 +146,7 @@ function InvoiceCalendar({ value, onCancel, onSave }: Props) {
         <DayPicker
           mode="single"
           hideNavigation
-          captionLayout="hidden"
+          captionLayout="label"
           month={calendarMonth}
           onMonthChange={setCalendarMonth}
           selected={selectedDate}

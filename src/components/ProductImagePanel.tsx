@@ -10,7 +10,7 @@ export default function ProductImagePanel({
   onSelect,
 }: ProductImagePanelProps) {
   return (
-    <aside className="flex h-full flex-col rounded-[28px] border border-slate-200 bg-slate-50 p-6">
+    <aside className="w-full max-w-[360px] rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl flex flex-col">
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-white">
         {imagePreview ? (
           <img

@@ -2,7 +2,6 @@ import React from "react";
 
 interface ProductEditorModalProps {
   children: React.ReactNode;
-  darkMode: boolean;
   imagePanelOpen?: boolean;
 }
 

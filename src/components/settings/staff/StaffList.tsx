@@ -13,6 +13,8 @@ interface StaffListProps {
   onChangeStaffPin: (staffId: string, pin: string) => Promise<void>;
 
   onDeleteStaff: (staffId: string) => Promise<void>;
+
+  showToast: (message: string) => void;
 }
 
 export default function StaffList({
@@ -22,6 +24,7 @@ export default function StaffList({
   onRenameStaff,
   onChangeStaffPin,
   onDeleteStaff,
+  showToast,
 }: StaffListProps) {
   if (staffs.length === 0) {
     return (
@@ -56,6 +59,7 @@ export default function StaffList({
           onRenameStaff={onRenameStaff}
           onChangeStaffPin={onChangeStaffPin}
           onDeleteStaff={onDeleteStaff}
+          showToast={showToast}
         />
       ))}
     </div>

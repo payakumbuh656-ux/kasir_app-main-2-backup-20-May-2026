@@ -11,6 +11,11 @@ import UnitCombobox from "./components/UnitCombobox";
 import ProductImagePanel from "./components/ProductImagePanel";
 import PageContainer from "./components/PageContainer";
 import Receipt from "./modules/receipt/Receipt";
+import HistoryToolbar from "./components/history/HistoryToolbar";
+import CashDashboard from "./components/dashboard/CashDashboard";
+import HistorySummary from "./components/history/HistorySummary";
+import HistoryDeleteDialog from "./components/history/HistoryDeleteDialog";
+import { filterHistoryTransactions, getHistoryRange, getHistorySales, type HistoryPreset, type HistoryRange } from "./components/history/historyRange";
 import { formatReceipt } from "./modules/receipt/receiptFormatter";
 import { PrinterService } from "./modules/receipt/printer/PrinterService";
 import StoreSettings from "./components/settings/StoreSettings";
@@ -202,6 +207,36 @@ export default function App() {
 
   const [expandedDiscountId, setExpandedDiscountId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [historyPreset, setHistoryPreset] = useState<HistoryPreset>("today");
+  const [historyToday, setHistoryToday] = useState(() => new Date());
+  const [historyCustomRange, setHistoryCustomRange] = useState<HistoryRange>(() => getHistoryRange("today"));
+  const [historyDeleteTarget, setHistoryDeleteTarget] = useState<{ id: string; ownerUid: string } | null>(null);
+  const [historyDeleteBusy, setHistoryDeleteBusy] = useState(false);
+  const [historyDeleteError, setHistoryDeleteError] = useState("");
+  const historyDeleteLock = useRef(false);
+  const [historyDeleteAllBusy, setHistoryDeleteAllBusy] = useState(false);
+
+  useEffect(() => {
+    setHistoryDeleteTarget(null);
+    setHistoryDeleteError("");
+  }, [user?.uid]);
+
+  // Keep relative presets current when a POS session stays open past midnight.
+  useEffect(() => {
+    const refreshDay = () => setHistoryToday((previous) => {
+      const next = new Date();
+      return previous.toDateString() === next.toDateString() ? previous : next;
+    });
+    const timer = window.setInterval(refreshDay, 60_000);
+    window.addEventListener("focus", refreshDay);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshDay); };
+  }, []);
+
+  const historyRange = useMemo(() => historyPreset === "custom"
+    ? historyCustomRange
+    : getHistoryRange(historyPreset, historyToday), [historyPreset, historyCustomRange, historyToday]);
+  const historyTransactions = useMemo(() => filterHistoryTransactions(transactions, historyRange), [transactions, historyRange]);
+  const historySales = useMemo(() => getHistorySales(historyTransactions), [historyTransactions]);
   const [stockMovements, setStockMovements] = useState<any[]>([]);
   const [selectedOutlet, setSelectedOutlet] = useState("Outlet Pusat");
   const [ownerPeriod, setOwnerPeriod] = useState("today");
@@ -871,13 +906,54 @@ export default function App() {
     }
   };
 
+  const handleDeleteHistoryTransaction = async () => {
+    if (!user || !historyDeleteTarget || historyDeleteLock.current || !canAccess("salesHistory")) return;
+    const target = historyDeleteTarget;
+    if (target.ownerUid !== user.uid || auth.currentUser?.uid !== target.ownerUid) {
+      setHistoryDeleteTarget(null);
+      setHistoryDeleteError("");
+      return;
+    }
+    if (!navigator.onLine) {
+      setHistoryDeleteError("Hubungkan internet sebelum menghapus transaksi.");
+      return;
+    }
+    historyDeleteLock.current = true;
+    setHistoryDeleteBusy(true);
+    setHistoryDeleteError("");
+    try {
+      await deleteDoc(doc(db, "users", target.ownerUid, "transactions", target.id));
+      if (auth.currentUser?.uid !== target.ownerUid) return;
+      if (selectedTransaction?.id === target.id) {
+        setSelectedTransaction(null);
+        setIsTransactionDetailOpen(false);
+      }
+      if (lastTransaction?.id === target.id) {
+        setLastTransaction(null);
+        setIsReceiptModalOpen(false);
+      }
+      setHistoryDeleteTarget(null);
+      showToast("Transaksi berhasil dihapus");
+    } catch (error) {
+      console.error(error);
+      if (auth.currentUser?.uid === target.ownerUid) {
+        setHistoryDeleteError("Transaksi gagal dihapus. Silakan coba lagi.");
+      }
+    } finally {
+      historyDeleteLock.current = false;
+      setHistoryDeleteBusy(false);
+    }
+  };
+
   const handleDeleteAllTransactions = async () => {
-    if (!user) return;
+    if (!user || historyDeleteLock.current) return;
 
     if (!window.confirm("Hapus semua riwayat transaksi?")) {
       return;
     }
 
+    historyDeleteLock.current = true;
+    setHistoryDeleteAllBusy(true);
     try {
       const snapshot = await getDocs(collection(db, "users", user.uid, "transactions"));
 
@@ -890,6 +966,9 @@ export default function App() {
       console.error(error);
 
       showToast("Gagal menghapus riwayat transaksi");
+    } finally {
+      historyDeleteLock.current = false;
+      setHistoryDeleteAllBusy(false);
     }
   };
 
@@ -1787,6 +1866,8 @@ export default function App() {
         items: returnItems,
 
         totalRefund,
+
+        paymentMethod: selectedTransaction.paymentMethod || "Tunai",
 
         reason: returnReason,
 
@@ -2951,23 +3032,33 @@ export default function App() {
         {/* VIEW: HISTORY TRANSAKSI */}
         {view === "history" && canAccess("salesHistory") && (
           <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6 overflow-y-auto flex-1 animate-in slide-in-from-bottom duration-500">
-            <header className="flex items-center justify-between mb-8">
+            <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Riwayat Penjualan</h1>
+                <h1 className={`text-2xl font-bold ${textPrimary}`}>Riwayat Penjualan</h1>
 
-                <p className="text-slate-500 text-sm">Semua transaksi yang sudah selesai.</p>
+                <p className={`text-sm ${textSecondary}`}>Semua transaksi yang sudah selesai.</p>
+
               </div>
 
               <button
                 onClick={handleDeleteAllTransactions}
-                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all"
+                disabled={historyDeleteBusy || historyDeleteAllBusy}
+                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:cursor-wait disabled:opacity-60"
               >
                 🗑 Hapus Semua
               </button>
             </header>
 
+            <HistoryToolbar
+              preset={historyPreset}
+              range={historyRange}
+              darkMode={darkMode}
+              onPresetChange={(preset) => { setHistoryToday(new Date()); setHistoryPreset(preset); }}
+              onRangeChange={(range) => { setHistoryCustomRange(range); setHistoryPreset("custom"); }}
+            />
+
             <div className="space-y-4">
-              {transactions.map((t) => (
+              {historyTransactions.map((t) => (
                 <div
                   key={t.id}
                   className={`group rounded-3xl border p-6 transition-all hover:shadow-xl flex items-center justify-between gap-8 ${
@@ -3076,15 +3167,44 @@ export default function App() {
                       >
                         Print
                       </button>
+                    <button
+                      type="button"
+                      title="Hapus transaksi"
+                      aria-label={`Hapus transaksi ${formatInvoiceNumber(t.id)}`}
+                      disabled={historyDeleteBusy || historyDeleteAllBusy}
+                      onClick={() => {
+                        if (!user) return;
+                        setHistoryDeleteError("");
+                        setHistoryDeleteTarget({ id: t.id, ownerUid: user.uid });
+                      }}
+                      className={`inline-flex items-center justify-center rounded-xl p-2.5 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 ${darkMode ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-red-50 text-red-500 hover:bg-red-100"}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {transactions.length === 0 && (
-                <div className="py-20 text-center text-slate-400">Belum ada transaksi hari ini.</div>
+              {historyTransactions.length === 0 && (
+                <div className={`rounded-3xl border py-16 text-center ${cardClass}`}>
+                  <History size={32} className="mx-auto mb-3 text-slate-400" />
+                  <p className={`font-semibold ${textPrimary}`}>Tidak ada transaksi pada rentang ini.</p>
+                  <p className={`mt-1 text-sm ${textSecondary}`}>Pilih rentang tanggal lain untuk melihat riwayat penjualan.</p>
+                </div>
               )}
             </div>
+            <HistorySummary count={historyTransactions.length} sales={historySales} darkMode={darkMode} />
+            {historyDeleteTarget && historyDeleteTarget.ownerUid === user?.uid && (
+              <HistoryDeleteDialog
+                invoice={formatInvoiceNumber(historyDeleteTarget.id)}
+                darkMode={darkMode}
+                busy={historyDeleteBusy}
+                error={historyDeleteError}
+                onCancel={() => { if (!historyDeleteLock.current) setHistoryDeleteTarget(null); }}
+                onConfirm={handleDeleteHistoryTransaction}
+              />
+            )}
           </div>
         )}
 
@@ -3286,6 +3406,16 @@ export default function App() {
                 <h2 className="text-[36px] font-black text-green-600 mt-2">1</h2>
               </div>
             </div>
+
+            {user && (
+              <CashDashboard
+                key={user.uid}
+                userId={user.uid}
+                period={ownerPeriod === "month" ? "month" : ownerPeriod === "year" ? "year" : "today"}
+                darkMode={darkMode}
+                onNotify={showToast}
+              />
+            )}
 
             <div className="mt-10 bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
               <h2 className="text-xl font-bold text-indigo-600 mb-4">Grafik Penjualan 7 Hari Terakhir</h2>

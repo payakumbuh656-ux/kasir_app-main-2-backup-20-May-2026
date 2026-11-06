@@ -1,5 +1,5 @@
 import { Info, UserRound, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   createStaff,
   DEFAULT_STAFF_PERMISSIONS,
